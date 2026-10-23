@@ -363,6 +363,7 @@ function initAuthModal() {
   // Open modal
   function openModal() {
     overlay.classList.add('open');
+    document.body.classList.add('modal-open');
     document.body.style.overflow = 'hidden';
     // Focus the first input in the active panel
     setTimeout(() => {
@@ -375,6 +376,7 @@ function initAuthModal() {
   // Close modal
   function closeModal() {
     overlay.classList.remove('open');
+    document.body.classList.remove('modal-open');
     document.body.style.overflow = '';
   }
 

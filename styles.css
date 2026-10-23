@@ -1352,6 +1352,12 @@ a:hover { color: var(--clr-primary-800); }
    AUTH MODAL
    =================================================================== */
 
+/* Body lock when modal is open */
+body.modal-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 /* Overlay */
 .modal-overlay {
   position: fixed;
@@ -1365,6 +1371,7 @@ a:hover { color: var(--clr-primary-800); }
   -webkit-backdrop-filter: blur(8px);
   opacity: 0;
   visibility: hidden;
+  overscroll-behavior: contain;
   transition: opacity var(--dur-slow) var(--ease-out),
               visibility var(--dur-slow),
               backdrop-filter var(--dur-slow);
@@ -1380,8 +1387,11 @@ a:hover { color: var(--clr-primary-800); }
 .modal-panel {
   width: 100%;
   max-width: 460px;
-  max-height: 90vh;
+  max-height: 85vh;
+  max-height: 85dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: var(--clr-white);
   border-radius: var(--radius-2xl);
   box-shadow: 0 25px 50px -12px rgba(0,0,0,.18),
@@ -1641,6 +1651,10 @@ a:hover { color: var(--clr-primary-800); }
   .modal-panel {
     max-width: 100%;
     max-height: 85vh;
+    max-height: 85dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
 

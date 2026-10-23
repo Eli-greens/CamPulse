@@ -89,28 +89,65 @@
       <div class="auth-panel active" id="panel-register" role="tabpanel" aria-labelledby="tab-register">
         <form class="modal-form" id="register-form" novalidate>
           <div class="form-group">
-            <label for="reg-name">Full Name</label>
-            <input class="input" type="text" id="reg-name" placeholder="e.g. Ada Lovelace" required />
+            <label for="reg-name">Full Name <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="text" id="reg-name" placeholder="e.g. Ada Lovelace" required aria-describedby="reg-name-error" />
+            <div class="form-error-msg" id="reg-name-error" role="alert" aria-live="polite"></div>
           </div>
           <div class="form-group">
-            <label for="reg-matric">Matric / Student ID</label>
-            <input class="input" type="text" id="reg-matric" placeholder="e.g. STU/2024/001" required />
+            <label for="reg-matric">Matric / Student ID <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="text" id="reg-matric" placeholder="e.g. CSC/2021/042" required aria-describedby="reg-matric-error" />
+            <div class="form-error-msg" id="reg-matric-error" role="alert" aria-live="polite"></div>
           </div>
           <div class="form-group">
-            <label for="reg-email">University Email</label>
-            <input class="input" type="email" id="reg-email" placeholder="you@university.edu" required />
+            <label for="reg-email">University Email <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="email" id="reg-email" placeholder="e.g. yourname@student.oauife.edu.ng" required aria-describedby="reg-email-hint reg-email-error" />
+            <p class="form-hint" id="reg-email-hint">Must end in <strong>@student.oauife.edu.ng</strong></p>
+            <div class="form-error-msg" id="reg-email-error" role="alert" aria-live="polite"></div>
           </div>
           <div class="form-group">
-            <label for="reg-password">Password</label>
+            <label for="reg-password">Password <span class="required-mark" aria-hidden="true">*</span></label>
             <div class="password-wrapper">
-              <input class="input" type="password" id="reg-password" placeholder="Min. 8 characters" minlength="8" required />
+              <input class="input" type="password" id="reg-password" placeholder="Min. 8 characters" minlength="8" required aria-describedby="reg-password-error" />
               <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="reg-password">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
+            <div class="form-error-msg" id="reg-password-error" role="alert" aria-live="polite"></div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+          <button type="submit" class="btn btn-primary btn-block" id="reg-submit-btn">
+            <span class="btn-spinner" id="reg-spinner" hidden aria-hidden="true"></span>
+            <span id="reg-btn-text">Create Account</span>
+          </button>
           <p class="form-link">Already have an account? <a href="#" id="switch-to-login">Sign in</a></p>
+        </form>
+      </div>
+
+      <!-- Email Verification Panel -->
+      <div class="auth-panel" id="panel-verify" role="tabpanel" aria-labelledby="verify-modal-title">
+        <div class="verify-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
+        <h3 class="verify-title" id="verify-modal-title">Verify University Email</h3>
+        <p class="verify-subtext">We've sent a 6-digit verification code to <strong id="verify-target-email">your email</strong>. Enter the code below to complete student registration.</p>
+
+        <div class="verify-demo-note" role="note">
+          Demo verification code: <strong id="demo-code-display">482910</strong>
+        </div>
+
+        <form class="modal-form" id="verify-form" novalidate>
+          <div class="form-group">
+            <label for="verify-code">6-Digit Verification Code</label>
+            <input class="input verify-code-input" type="text" id="verify-code" maxlength="6" inputmode="numeric" placeholder="482910" required aria-describedby="verify-code-error" />
+            <div class="form-error-msg" id="verify-code-error" role="alert" aria-live="polite"></div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="verify-submit-btn">
+            <span class="btn-spinner" id="verify-spinner" hidden aria-hidden="true"></span>
+            <span id="verify-btn-text">Verify &amp; Activate Account</span>
+          </button>
+          <p class="form-link">Didn't receive the code? <a href="#" id="resend-code-btn">Resend code</a> or <a href="#" id="back-to-reg-btn">Change email</a></p>
         </form>
       </div>
 
@@ -118,19 +155,24 @@
       <div class="auth-panel" id="panel-login" role="tabpanel" aria-labelledby="tab-login">
         <form class="modal-form" id="login-form" novalidate>
           <div class="form-group">
-            <label for="login-email">University Email</label>
-            <input class="input" type="email" id="login-email" placeholder="you@university.edu" required />
+            <label for="login-email">University Email <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="email" id="login-email" placeholder="e.g. yourname@student.oauife.edu.ng" required aria-describedby="login-email-error" />
+            <div class="form-error-msg" id="login-email-error" role="alert" aria-live="polite"></div>
           </div>
           <div class="form-group">
-            <label for="login-password">Password</label>
+            <label for="login-password">Password <span class="required-mark" aria-hidden="true">*</span></label>
             <div class="password-wrapper">
-              <input class="input" type="password" id="login-password" placeholder="Enter your password" required />
+              <input class="input" type="password" id="login-password" placeholder="Enter your password" required aria-describedby="login-password-error" />
               <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="login-password">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
+            <div class="form-error-msg" id="login-password-error" role="alert" aria-live="polite"></div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+          <button type="submit" class="btn btn-primary btn-block" id="login-submit-btn">
+            <span class="btn-spinner" id="login-spinner" hidden aria-hidden="true"></span>
+            <span id="login-btn-text">Sign In</span>
+          </button>
           <p class="form-link">Don't have an account? <a href="#" id="switch-to-register">Register</a></p>
         </form>
       </div>
@@ -245,7 +287,7 @@
           <!-- Ticket cards rendered by JS -->
         </div>
 
-        <!-- Empty State -->
+        <!-- Empty State with Example Preview -->
         <div class="empty-state" id="empty-state" hidden>
           <div class="empty-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -256,7 +298,53 @@
           </div>
           <h3 id="empty-title">No tickets yet</h3>
           <p id="empty-desc">Submit your first complaint or piece of feedback and it will appear here.</p>
-          <a href="index.html" class="btn btn-primary" style="margin-top:1.5rem;">Submit Now</a>
+
+          <!-- Interactive Sample Ticket for New Users -->
+          <div class="sample-ticket-preview" id="sample-ticket-container">
+            <div class="sample-ticket-banner" role="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span><strong>Sample Preview:</strong> Here is how your tracked complaints will look once submitted:</span>
+            </div>
+
+            <article class="ticket-card ticket-card--example" aria-label="Example preview ticket">
+              <div class="ticket-header">
+                <div class="ticket-id-wrap">
+                  <span class="ticket-id">CP-2026-0042</span>
+                  <span class="example-tag">EXAMPLE</span>
+                </div>
+                <span class="ticket-category">Facilities &amp; Infrastructure</span>
+                <span class="ticket-urgent-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                  Urgent
+                </span>
+              </div>
+              <div class="ticket-body">
+                <h3>Water supply disruption at Fajuyi Hall Block 2</h3>
+                <p>Tap water supply has been unavailable on the 2nd and 3rd floors since yesterday morning. Students are currently carrying buckets from the ground floor.</p>
+              </div>
+              <div class="ticket-footer">
+                <div class="ticket-meta">
+                  <span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    Today, 10:45 AM
+                  </span>
+                  <span class="sample-dept-tag">Dept: Works &amp; Maintenance</span>
+                </div>
+                <span class="status-badge reviewed">Reviewed</span>
+              </div>
+            </article>
+
+            <div class="empty-cta-box">
+              <a href="index.html" class="btn btn-primary btn-lg" id="empty-submit-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Submit Your First Complaint
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 

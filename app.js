@@ -1,21 +1,44 @@
 /* ===================================================================
    CamPulse — Vanilla JavaScript
-   Handles: form submission, localStorage persistence, dashboard
-   rendering, filtering, search, toasts, and mobile nav.
+   Phase 1: Trust, Verification & Accessible Foundation
+   - Centralized University Config (@student.oauife.edu.ng)
+   - Dynamic Stats (only shown when >= 20 real tickets exist)
+   - Accessible Form Validation with Loading & Error States
+   - Student Email Verification Modal Flow
+   - Empty Dashboard with Interactive Example Preview
    =================================================================== */
 
 'use strict';
 
+// ── Application Configuration ────────────────────────────────────────
+
+const APP_CONFIG = {
+  UNIVERSITY_NAME: 'Obafemi Awolowo University (OAU)',
+  ALLOWED_EMAIL_DOMAINS: ['@student.oauife.edu.ng'],
+  MIN_PASSWORD_LENGTH: 8,
+  STATS_MIN_TICKETS: 20,
+  DEMO_OTP: '482910'
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/** Generate a short readable ticket ID like CP-8A3F */
+/** Check if an email matches the approved university domains */
+function isAllowedUniversityEmail(email) {
+  if (!email) return false;
+  const trimmed = email.trim().toLowerCase();
+  return APP_CONFIG.ALLOWED_EMAIL_DOMAINS.some(domain => trimmed.endsWith(domain.toLowerCase()));
+}
+
+/** Generate a readable ticket ID like CP-2026-0042 */
 function generateId() {
-  const hex = Math.random().toString(16).substring(2, 6).toUpperCase();
-  return `CP-${hex}`;
+  const year = new Date().getFullYear();
+  const randNum = Math.floor(1000 + Math.random() * 9000);
+  return `CP-${year}-${randNum}`;
 }
 
 /** Format an ISO date string into a human-readable form */
 function formatDate(iso) {
+  if (!iso) return 'Just now';
   const d = new Date(iso);
   const opts = { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
   return d.toLocaleDateString('en-US', opts);
@@ -82,7 +105,7 @@ function initMobileNav() {
     toggle.setAttribute('aria-expanded', String(isOpen));
   });
 
-  // Close when clicking a link
+  // Close when clicking any nav link
   nav.querySelectorAll('a').forEach(link => {
     link.addEventListener('click', () => {
       nav.classList.remove('open');
@@ -91,27 +114,92 @@ function initMobileNav() {
   });
 }
 
-// ── Submission Form (index.html) ─────────────────────────────────────
+// ── Live Impact Stats (Phase 1: Trust & Truth in Metrics) ─────────────
+
+function initLiveStats() {
+  const strip = document.getElementById('live-stats-strip');
+  if (!strip) return;
+
+  const tickets = getTickets();
+
+  // Item 1: Only show stats once real data exists (>= 20 tickets)
+  if (tickets.length < APP_CONFIG.STATS_MIN_TICKETS) {
+    strip.hidden = true;
+    return;
+  }
+
+  // Real data exists: compute metrics dynamically
+  const total = tickets.length;
+  const resolved = tickets.filter(t => t.status === 'resolved').length;
+  const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
+  // Compute average resolution or response hours if available
+  let avgHours = 24;
+  const resolvedWithDates = tickets.filter(t => t.status === 'resolved' && t.createdAt && t.resolvedAt);
+  if (resolvedWithDates.length > 0) {
+    const totalDiffMs = resolvedWithDates.reduce((acc, t) => acc + (new Date(t.resolvedAt) - new Date(t.createdAt)), 0);
+    avgHours = Math.max(1, Math.round(totalDiffMs / (resolvedWithDates.length * 3600000)));
+  }
+
+  const countEl = document.getElementById('stat-live-count');
+  const rateEl = document.getElementById('stat-live-rate');
+  const timeEl = document.getElementById('stat-live-time');
+
+  if (countEl) countEl.dataset.to = total;
+  if (rateEl) rateEl.dataset.to = resolutionRate;
+  if (timeEl) timeEl.dataset.to = avgHours;
+
+  strip.hidden = false;
+}
+
+// ── Submission Form with Validation & Loading States ─────────────────
 
 function initSubmitForm() {
   const form = document.getElementById('complaint-form');
-  if (!form) return; // Not on the submit page
+  if (!form) return; // Not on the submission page
 
-  const description = document.getElementById('description');
-  const charCount = document.getElementById('char-count');
-  const charCounter = document.getElementById('char-counter');
+  const categoryInput = form.category;
+  const subjectInput = form.subject;
+  const descInput = form.description;
   const urgencyCheckbox = document.getElementById('urgency');
   const urgencyState = document.getElementById('urgency-state');
-  const formCard = document.getElementById('form-card');
+  const charCount = document.getElementById('char-count');
+  const charCounter = document.getElementById('char-counter');
+  const submitBtn = document.getElementById('submit-btn');
+  const submitSpinner = document.getElementById('submit-spinner');
+  const submitIcon = document.getElementById('submit-icon');
+  const submitText = document.getElementById('submit-text');
   const successMsg = document.getElementById('success-msg');
   const successTicketId = document.getElementById('success-ticket-id');
   const newComplaintBtn = document.getElementById('new-complaint-btn');
 
-  // Character counter
-  description.addEventListener('input', () => {
-    const len = description.value.length;
-    charCount.textContent = len;
+  // Helper: clear inline error
+  function clearError(input, errorElId) {
+    input.classList.remove('has-error');
+    const err = document.getElementById(errorElId);
+    if (err) {
+      err.textContent = '';
+      err.classList.remove('visible');
+    }
+  }
 
+  // Helper: display inline error
+  function setError(input, errorElId, message) {
+    input.classList.add('has-error');
+    const err = document.getElementById(errorElId);
+    if (err) {
+      err.textContent = message;
+      err.classList.add('visible');
+    }
+  }
+
+  // Clear errors on user input
+  categoryInput.addEventListener('change', () => clearError(categoryInput, 'category-error'));
+  subjectInput.addEventListener('input', () => clearError(subjectInput, 'subject-error'));
+  descInput.addEventListener('input', () => {
+    clearError(descInput, 'description-error');
+    const len = descInput.value.length;
+    charCount.textContent = len;
     charCounter.classList.remove('warn', 'limit');
     if (len >= 2000) charCounter.classList.add('limit');
     else if (len >= 1800) charCounter.classList.add('warn');
@@ -124,56 +212,105 @@ function initSubmitForm() {
     urgencyState.classList.toggle('on', isUrgent);
   });
 
-  // Form submission
-  form.addEventListener('submit', (e) => {
+  // Form submission handler
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const category = form.category.value;
-    const subject = form.subject.value.trim();
-    const desc = form.description.value.trim();
-    const urgent = form.urgency.checked;
+    let hasError = false;
+    let firstInvalid = null;
 
-    // Basic validation
-    if (!category || !subject || !desc) {
-      showToast('Please fill in all required fields.');
+    // Validate Category
+    if (!categoryInput.value) {
+      setError(categoryInput, 'category-error', 'Please select an issue category.');
+      hasError = true;
+      if (!firstInvalid) firstInvalid = categoryInput;
+    }
+
+    // Validate Subject
+    const subject = subjectInput.value.trim();
+    if (!subject) {
+      setError(subjectInput, 'subject-error', 'Please provide a subject for your complaint.');
+      hasError = true;
+      if (!firstInvalid) firstInvalid = subjectInput;
+    } else if (subject.length < 5) {
+      setError(subjectInput, 'subject-error', 'Subject must be at least 5 characters long.');
+      hasError = true;
+      if (!firstInvalid) firstInvalid = subjectInput;
+    }
+
+    // Validate Description
+    const desc = descInput.value.trim();
+    if (!desc) {
+      setError(descInput, 'description-error', 'Please describe the issue in detail.');
+      hasError = true;
+      if (!firstInvalid) firstInvalid = descInput;
+    } else if (desc.length < 15) {
+      setError(descInput, 'description-error', 'Description must be at least 15 characters to assist staff investigation.');
+      hasError = true;
+      if (!firstInvalid) firstInvalid = descInput;
+    }
+
+    if (hasError) {
+      firstInvalid.focus();
       return;
     }
 
-    // Randomly assign a demo status (mostly Pending for realism)
+    // Button loading state
+    submitBtn.classList.add('btn-loading');
+    submitBtn.setAttribute('aria-busy', 'true');
+    if (submitSpinner) submitSpinner.hidden = false;
+    if (submitIcon) submitIcon.style.display = 'none';
+    if (submitText) submitText.textContent = 'Submitting Complaint...';
+
+    // Simulated network delay (ready for Supabase migration)
+    await new Promise(resolve => setTimeout(resolve, 550));
+
     const statuses = ['pending', 'pending', 'pending', 'reviewed', 'resolved'];
     const status = statuses[Math.floor(Math.random() * statuses.length)];
 
     const ticket = {
       id: generateId(),
-      category,
+      category: categoryInput.value,
       subject,
       description: desc,
-      urgent,
+      urgent: urgencyCheckbox.checked,
       status,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
     };
 
     const tickets = getTickets();
     tickets.unshift(ticket);
     saveTickets(tickets);
 
-    // Show success state
+    // Reset button state
+    submitBtn.classList.remove('btn-loading');
+    submitBtn.removeAttribute('aria-busy');
+    if (submitSpinner) submitSpinner.hidden = true;
+    if (submitIcon) submitIcon.style.display = '';
+    if (submitText) submitText.textContent = 'Submit Complaint';
+
+    // Show success view
     form.hidden = true;
     successMsg.hidden = false;
     successTicketId.textContent = ticket.id;
 
     showToast(`Ticket ${ticket.id} created successfully!`);
+    initLiveStats();
   });
 
-  // "Submit another" button
+  // "Submit Another" button
   newComplaintBtn.addEventListener('click', () => {
     form.reset();
+    clearError(categoryInput, 'category-error');
+    clearError(subjectInput, 'subject-error');
+    clearError(descInput, 'description-error');
     charCount.textContent = '0';
     charCounter.classList.remove('warn', 'limit');
     urgencyState.textContent = 'Normal';
     urgencyState.classList.remove('on');
     successMsg.hidden = true;
     form.hidden = false;
+    categoryInput.focus();
   });
 }
 
@@ -187,12 +324,13 @@ function initDashboard() {
   const emptyState = document.getElementById('empty-state');
   const emptyTitle = document.getElementById('empty-title');
   const emptyDesc = document.getElementById('empty-desc');
+  const sampleContainer = document.getElementById('sample-ticket-container');
   const pills = document.querySelectorAll('.pill[data-filter]');
 
   let activeFilter = 'all';
   let searchQuery = '';
 
-  // ── Clean up legacy dummy/demo tickets if present ──
+  // Clean up legacy placeholder IDs if present
   try {
     const existing = getTickets();
     const demoIds = new Set(['CP-A1B2', 'CP-C3D4', 'CP-E5F6', 'CP-G7H8', 'CP-I9J0', 'CP-K1L2']);
@@ -218,7 +356,6 @@ function initDashboard() {
     const el = document.getElementById(elId);
     if (!el) return;
     el.dataset.to = target;
-    // If not yet revealed by intersection observer, let io handle initial count animation
     if (el.classList.contains('count') && !el.classList.contains('in')) {
       return;
     }
@@ -230,7 +367,7 @@ function initDashboard() {
 
     function tick(now) {
       const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
       el.textContent = Math.round(current + (target - current) * eased);
       if (progress < 1) requestAnimationFrame(tick);
     }
@@ -241,13 +378,13 @@ function initDashboard() {
     const allTickets = getTickets();
     updateCounts(allTickets);
 
-    // Filter
+    // Apply Filter
     let filtered = allTickets;
     if (activeFilter !== 'all') {
       filtered = filtered.filter(t => t.status === activeFilter);
     }
 
-    // Search
+    // Apply Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(t =>
@@ -260,19 +397,25 @@ function initDashboard() {
 
     grid.innerHTML = '';
 
+    // Handle Empty States (Item 4: Clearly labelled sample ticket for new users)
     if (filtered.length === 0) {
       emptyState.hidden = false;
-      if (searchQuery || activeFilter !== 'all') {
-        emptyTitle.textContent = 'No matching tickets';
-        emptyDesc.textContent = 'Try adjusting your search or filters.';
-      } else {
+      if (allTickets.length === 0) {
+        // First-time user: Show interactive sample preview
         emptyTitle.textContent = 'No tickets yet';
         emptyDesc.textContent = 'Submit your first complaint or piece of feedback and it will appear here.';
+        if (sampleContainer) sampleContainer.hidden = false;
+      } else {
+        // Empty due to filter/search query mismatch
+        emptyTitle.textContent = 'No matching tickets';
+        emptyDesc.textContent = 'Try adjusting your search query or status filter.';
+        if (sampleContainer) sampleContainer.hidden = true;
       }
       return;
     }
 
     emptyState.hidden = true;
+    if (sampleContainer) sampleContainer.hidden = true;
 
     filtered.forEach(ticket => {
       const card = document.createElement('article');
@@ -307,7 +450,7 @@ function initDashboard() {
     });
   }
 
-  // Filter pill clicks
+  // Filter clicks
   pills.forEach(pill => {
     pill.addEventListener('click', () => {
       pills.forEach(p => {
@@ -321,21 +464,20 @@ function initDashboard() {
     });
   });
 
-  // Search
+  // Search input
   let searchTimeout;
   searchInput.addEventListener('input', () => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
       searchQuery = searchInput.value.trim();
       renderTickets();
-    }, 200);
+    }, 180);
   });
 
-  // Initial render
   renderTickets();
 }
 
-// ── Auth Modal ───────────────────────────────────────────────────────
+// ── Auth Modal with University Email Domain & Verification Flow ──────
 
 function initAuthModal() {
   const overlay = document.getElementById('auth-modal');
@@ -348,15 +490,49 @@ function initAuthModal() {
   const adminToggle = document.getElementById('admin-toggle-btn');
   const adminFormContainer = document.getElementById('admin-form-container');
 
-  // Helper: switch tab
+  // Forms
+  const registerForm = document.getElementById('register-form');
+  const verifyForm = document.getElementById('verify-form');
+  const loginForm = document.getElementById('login-form');
+  const adminForm = document.getElementById('admin-login-form');
+
+  // Temporary state for unverified registrations
+  let pendingStudentRegistration = null;
+
+  // Helper: set inline error inside modal
+  function setModalError(input, errorElId, message) {
+    if (input) input.classList.add('has-error');
+    const err = document.getElementById(errorElId);
+    if (err) {
+      err.textContent = message;
+      err.classList.add('visible');
+    }
+  }
+
+  // Helper: clear inline error inside modal
+  function clearModalError(input, errorElId) {
+    if (input) input.classList.remove('has-error');
+    const err = document.getElementById(errorElId);
+    if (err) {
+      err.textContent = '';
+      err.classList.remove('visible');
+    }
+  }
+
+  // Switch between tabs / panels
   function switchTab(targetId) {
     tabs.forEach(t => {
       const isActive = t.id === targetId;
       t.classList.toggle('active', isActive);
       t.setAttribute('aria-selected', String(isActive));
     });
+
     panels.forEach(p => {
-      p.classList.toggle('active', p.id === (targetId === 'tab-register' ? 'panel-register' : 'panel-login'));
+      let shouldShow = false;
+      if (targetId === 'tab-register') shouldShow = p.id === 'panel-register';
+      else if (targetId === 'tab-login') shouldShow = p.id === 'panel-login';
+      else if (targetId === 'tab-verify') shouldShow = p.id === 'panel-verify';
+      p.classList.toggle('active', shouldShow);
     });
   }
 
@@ -368,12 +544,11 @@ function initAuthModal() {
     document.body.style.overflow = 'hidden';
     const panel = overlay.querySelector('.modal-panel');
     if (panel) panel.scrollTop = 0;
-    // Focus the first input in the active panel without triggering unwanted scroll jump
     setTimeout(() => {
       const activePanel = overlay.querySelector('.auth-panel.active');
       const firstInput = activePanel?.querySelector('input');
       if (firstInput) firstInput.focus({ preventScroll: true });
-    }, 300);
+    }, 250);
   }
 
   // Close modal
@@ -387,20 +562,12 @@ function initAuthModal() {
   openBtn.addEventListener('click', openModal);
   closeBtn.addEventListener('click', closeModal);
 
-  // Prevent wheel event from chaining to background document while scrolling inside modal panel
-  const panel = overlay.querySelector('.modal-panel');
-  if (panel) {
-    panel.addEventListener('wheel', (e) => {
-      e.stopPropagation();
-    }, { passive: true });
-  }
-
-  // Close on overlay click (not panel)
+  // Close on overlay click
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeModal();
   });
 
-  // Close on Escape
+  // Close on Escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && overlay.classList.contains('open')) {
       closeModal();
@@ -412,9 +579,11 @@ function initAuthModal() {
     tab.addEventListener('click', () => switchTab(tab.id));
   });
 
-  // In-panel links "Sign in" / "Register"
+  // Cross-panel links
   const switchToLogin = document.getElementById('switch-to-login');
   const switchToRegister = document.getElementById('switch-to-register');
+  const backToRegBtn = document.getElementById('back-to-reg-btn');
+  const resendCodeBtn = document.getElementById('resend-code-btn');
 
   if (switchToLogin) {
     switchToLogin.addEventListener('click', (e) => {
@@ -428,6 +597,19 @@ function initAuthModal() {
       switchTab('tab-register');
     });
   }
+  if (backToRegBtn) {
+    backToRegBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab('tab-register');
+    });
+  }
+  if (resendCodeBtn) {
+    resendCodeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetEmail = pendingStudentRegistration?.email || 'your email';
+      showToast(`New code sent to ${targetEmail} (Code: ${APP_CONFIG.DEMO_OTP})`);
+    });
+  }
 
   // Admin section toggle
   if (adminToggle && adminFormContainer) {
@@ -435,7 +617,6 @@ function initAuthModal() {
       const isOpen = adminFormContainer.classList.toggle('active');
       adminToggle.textContent = isOpen ? 'Hide Admin Form' : 'Admin Sign In';
       if (isOpen) {
-        // Re-add SVG icon to button
         adminToggle.insertAdjacentHTML('afterbegin',
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> '
         );
@@ -453,81 +634,237 @@ function initAuthModal() {
       if (!input) return;
       const isPassword = input.type === 'password';
       input.type = isPassword ? 'text' : 'password';
-      // Swap icon
       btn.innerHTML = isPassword
         ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
         : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
     });
   });
 
-  // Student Registration form
-  const registerForm = document.getElementById('register-form');
+  // 1. Student Registration Form (with University Email Domain Validation)
   if (registerForm) {
-    registerForm.addEventListener('submit', (e) => {
+    const regName = registerForm.querySelector('#reg-name');
+    const regMatric = registerForm.querySelector('#reg-matric');
+    const regEmail = registerForm.querySelector('#reg-email');
+    const regPassword = registerForm.querySelector('#reg-password');
+    const regSubmitBtn = registerForm.querySelector('#reg-submit-btn');
+    const regSpinner = registerForm.querySelector('#reg-spinner');
+    const regBtnText = registerForm.querySelector('#reg-btn-text');
+
+    regName.addEventListener('input', () => clearModalError(regName, 'reg-name-error'));
+    regMatric.addEventListener('input', () => clearModalError(regMatric, 'reg-matric-error'));
+    regEmail.addEventListener('input', () => clearModalError(regEmail, 'reg-email-error'));
+    regPassword.addEventListener('input', () => clearModalError(regPassword, 'reg-password-error'));
+
+    registerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = registerForm.querySelector('#reg-name').value.trim();
-      const matric = registerForm.querySelector('#reg-matric').value.trim();
-      const email = registerForm.querySelector('#reg-email').value.trim();
-      const password = registerForm.querySelector('#reg-password').value;
 
-      if (!name || !matric || !email || !password) {
-        showToast('Please fill in all registration fields.');
-        return;
-      }
-      if (password.length < 8) {
-        showToast('Password must be at least 8 characters.');
-        return;
+      let hasError = false;
+      let firstInvalid = null;
+
+      const name = regName.value.trim();
+      if (!name) {
+        setModalError(regName, 'reg-name-error', 'Please enter your full name.');
+        hasError = true;
+        if (!firstInvalid) firstInvalid = regName;
       }
 
-      // Store user (demo — localStorage)
-      const user = { name, matric, email, role: 'student', createdAt: new Date().toISOString() };
-      localStorage.setItem('campulse_user', JSON.stringify(user));
+      const matric = regMatric.value.trim();
+      if (!matric) {
+        setModalError(regMatric, 'reg-matric-error', 'Please enter your student matric ID.');
+        hasError = true;
+        if (!firstInvalid) firstInvalid = regMatric;
+      }
 
-      showToast(`Welcome, ${name}! Account created.`);
-      closeModal();
-      registerForm.reset();
+      const email = regEmail.value.trim();
+      if (!email) {
+        setModalError(regEmail, 'reg-email-error', 'Please enter your university email.');
+        hasError = true;
+        if (!firstInvalid) firstInvalid = regEmail;
+      } else if (!isAllowedUniversityEmail(email)) {
+        // Enforce OAU email domain
+        setModalError(regEmail, 'reg-email-error', `Registration requires an official university email ending in ${APP_CONFIG.ALLOWED_EMAIL_DOMAINS[0]}`);
+        hasError = true;
+        if (!firstInvalid) firstInvalid = regEmail;
+      }
+
+      const password = regPassword.value;
+      if (!password) {
+        setModalError(regPassword, 'reg-password-error', 'Please create a password.');
+        hasError = true;
+        if (!firstInvalid) firstInvalid = regPassword;
+      } else if (password.length < APP_CONFIG.MIN_PASSWORD_LENGTH) {
+        setModalError(regPassword, 'reg-password-error', `Password must be at least ${APP_CONFIG.MIN_PASSWORD_LENGTH} characters.`);
+        hasError = true;
+        if (!firstInvalid) firstInvalid = regPassword;
+      }
+
+      if (hasError) {
+        firstInvalid.focus();
+        return;
+      }
+
+      // Button loading state
+      regSubmitBtn.classList.add('btn-loading');
+      regSubmitBtn.setAttribute('aria-busy', 'true');
+      if (regSpinner) regSpinner.hidden = false;
+      if (regBtnText) regBtnText.textContent = 'Sending Verification Code...';
+
+      await new Promise(r => setTimeout(r, 450));
+
+      // Store pending registration & transition to verification screen
+      pendingStudentRegistration = { name, matric, email, password, role: 'student' };
+
+      regSubmitBtn.classList.remove('btn-loading');
+      regSubmitBtn.removeAttribute('aria-busy');
+      if (regSpinner) regSpinner.hidden = true;
+      if (regBtnText) regBtnText.textContent = 'Create Account';
+
+      const targetEmailEl = document.getElementById('verify-target-email');
+      if (targetEmailEl) targetEmailEl.textContent = email;
+
+      switchTab('tab-verify');
+      showToast(`Verification code sent to ${email}`);
+
+      const codeInput = document.getElementById('verify-code');
+      if (codeInput) {
+        codeInput.value = '';
+        setTimeout(() => codeInput.focus(), 150);
+      }
     });
   }
 
-  // Student Login form
-  const loginForm = document.getElementById('login-form');
-  if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const email = loginForm.querySelector('#login-email').value.trim();
-      const password = loginForm.querySelector('#login-password').value;
+  // 2. Email Verification Form
+  if (verifyForm) {
+    const codeInput = verifyForm.querySelector('#verify-code');
+    const verifySubmitBtn = verifyForm.querySelector('#verify-submit-btn');
+    const verifySpinner = verifyForm.querySelector('#verify-spinner');
+    const verifyBtnText = verifyForm.querySelector('#verify-btn-text');
 
-      if (!email || !password) {
-        showToast('Please enter your email and password.');
+    codeInput.addEventListener('input', () => clearModalError(codeInput, 'verify-code-error'));
+
+    verifyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const code = codeInput.value.trim();
+      if (!code) {
+        setModalError(codeInput, 'verify-code-error', 'Please enter the 6-digit verification code.');
+        codeInput.focus();
         return;
       }
 
-      // Demo check
+      // Accept the demo OTP or any 6-digit code for testing
+      if (code !== APP_CONFIG.DEMO_OTP && code.length !== 6) {
+        setModalError(codeInput, 'verify-code-error', `Invalid code. For this prototype, use code: ${APP_CONFIG.DEMO_OTP}`);
+        codeInput.focus();
+        return;
+      }
+
+      // Verification loading state
+      verifySubmitBtn.classList.add('btn-loading');
+      verifySubmitBtn.setAttribute('aria-busy', 'true');
+      if (verifySpinner) verifySpinner.hidden = false;
+      if (verifyBtnText) verifyBtnText.textContent = 'Activating Account...';
+
+      await new Promise(r => setTimeout(r, 450));
+
+      const verifiedUser = {
+        ...(pendingStudentRegistration || {
+          name: 'Student',
+          matric: 'CSC/2021/042',
+          email: 'student@student.oauife.edu.ng'
+        }),
+        verified: true,
+        createdAt: new Date().toISOString()
+      };
+
+      localStorage.setItem('campulse_user', JSON.stringify(verifiedUser));
+
+      verifySubmitBtn.classList.remove('btn-loading');
+      verifySubmitBtn.removeAttribute('aria-busy');
+      if (verifySpinner) verifySpinner.hidden = true;
+      if (verifyBtnText) verifyBtnText.textContent = 'Verify & Activate Account';
+
+      showToast(`Account verified! Welcome to CamPulse, ${verifiedUser.name}!`);
+      closeModal();
+      registerForm?.reset();
+      verifyForm?.reset();
+      switchTab('tab-login');
+    });
+  }
+
+  // 3. Student Login Form
+  if (loginForm) {
+    const loginEmail = loginForm.querySelector('#login-email');
+    const loginPassword = loginForm.querySelector('#login-password');
+    const loginSubmitBtn = loginForm.querySelector('#login-submit-btn');
+    const loginSpinner = loginForm.querySelector('#login-spinner');
+    const loginBtnText = loginForm.querySelector('#login-btn-text');
+
+    loginEmail.addEventListener('input', () => clearModalError(loginEmail, 'login-email-error'));
+    loginPassword.addEventListener('input', () => clearModalError(loginPassword, 'login-password-error'));
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = loginEmail.value.trim();
+      const password = loginPassword.value;
+
+      if (!email) {
+        setModalError(loginEmail, 'login-email-error', 'Please enter your university email.');
+        loginEmail.focus();
+        return;
+      }
+      if (!password) {
+        setModalError(loginPassword, 'login-password-error', 'Please enter your password.');
+        loginPassword.focus();
+        return;
+      }
+
+      loginSubmitBtn.classList.add('btn-loading');
+      loginSubmitBtn.setAttribute('aria-busy', 'true');
+      if (loginSpinner) loginSpinner.hidden = false;
+      if (loginBtnText) loginBtnText.textContent = 'Signing In...';
+
+      await new Promise(r => setTimeout(r, 400));
+
+      loginSubmitBtn.classList.remove('btn-loading');
+      loginSubmitBtn.removeAttribute('aria-busy');
+      if (loginSpinner) loginSpinner.hidden = true;
+      if (loginBtnText) loginBtnText.textContent = 'Sign In';
+
       const stored = JSON.parse(localStorage.getItem('campulse_user') || '{}');
-      if (stored.email && stored.email === email) {
+      if (stored.email && stored.email.toLowerCase() === email.toLowerCase()) {
         showToast(`Welcome back, ${stored.name}!`);
       } else {
         showToast('Signed in successfully!');
       }
+
       closeModal();
       loginForm.reset();
     });
   }
 
-  // Admin Login form
-  const adminForm = document.getElementById('admin-login-form');
+  // 4. Admin Sign In Form
   if (adminForm) {
-    adminForm.addEventListener('submit', (e) => {
+    adminForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const adminId = adminForm.querySelector('#admin-id').value.trim();
-      const password = adminForm.querySelector('#admin-password').value;
+      const adminIdInput = adminForm.querySelector('#admin-id');
+      const adminPasswordInput = adminForm.querySelector('#admin-password');
+      const submitBtn = adminForm.querySelector('button[type="submit"]');
+
+      const adminId = adminIdInput.value.trim();
+      const password = adminPasswordInput.value;
 
       if (!adminId || !password) {
-        showToast('Please enter your Admin ID and password.');
+        showToast('Please enter your Admin/Staff ID and password.');
         return;
       }
 
-      showToast(`Admin ${adminId} signed in successfully!`);
+      submitBtn.classList.add('btn-loading');
+      await new Promise(r => setTimeout(r, 400));
+      submitBtn.classList.remove('btn-loading');
+
+      showToast(`Staff account ${adminId} authenticated successfully!`);
       closeModal();
       adminForm.reset();
       if (adminFormContainer) adminFormContainer.classList.remove('active');
@@ -535,7 +872,7 @@ function initAuthModal() {
   }
 }
 
-// ── Reveal-on-scroll & animated counters ─────────────────────────────
+// ── Reveal-on-Scroll & Animated Counters ─────────────────────────────
 
 function initRevealAnimations() {
   const io = new IntersectionObserver(es => es.forEach(e => {
@@ -555,7 +892,7 @@ function initRevealAnimations() {
   document.querySelectorAll('.reveal, .count').forEach(el => io.observe(el));
 }
 
-// ── Interactive button glow (follows mouse) ──────────────────────────
+// ── Interactive Button Glow (Follows Mouse Position) ─────────────────
 
 function initButtonGlow() {
   document.addEventListener('mousemove', (e) => {
@@ -569,11 +906,12 @@ function initButtonGlow() {
   });
 }
 
-// ── Init ─────────────────────────────────────────────────────────────
+// ── Initialize App on DOM Ready ──────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderScroll();
   initMobileNav();
+  initLiveStats();
   initSubmitForm();
   initDashboard();
   initAuthModal();

@@ -89,28 +89,65 @@
       <div class="auth-panel active" id="panel-register" role="tabpanel" aria-labelledby="tab-register">
         <form class="modal-form" id="register-form" novalidate>
           <div class="form-group">
-            <label for="reg-name">Full Name</label>
-            <input class="input" type="text" id="reg-name" placeholder="e.g. Ada Lovelace" required />
+            <label for="reg-name">Full Name <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="text" id="reg-name" placeholder="e.g. Ada Lovelace" required aria-describedby="reg-name-error" />
+            <div class="form-error-msg" id="reg-name-error" role="alert" aria-live="polite"></div>
           </div>
           <div class="form-group">
-            <label for="reg-matric">Matric / Student ID</label>
-            <input class="input" type="text" id="reg-matric" placeholder="e.g. STU/2024/001" required />
+            <label for="reg-matric">Matric / Student ID <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="text" id="reg-matric" placeholder="e.g. CSC/2021/042" required aria-describedby="reg-matric-error" />
+            <div class="form-error-msg" id="reg-matric-error" role="alert" aria-live="polite"></div>
           </div>
           <div class="form-group">
-            <label for="reg-email">University Email</label>
-            <input class="input" type="email" id="reg-email" placeholder="you@university.edu" required />
+            <label for="reg-email">University Email <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="email" id="reg-email" placeholder="e.g. yourname@student.oauife.edu.ng" required aria-describedby="reg-email-hint reg-email-error" />
+            <p class="form-hint" id="reg-email-hint">Must end in <strong>@student.oauife.edu.ng</strong></p>
+            <div class="form-error-msg" id="reg-email-error" role="alert" aria-live="polite"></div>
           </div>
           <div class="form-group">
-            <label for="reg-password">Password</label>
+            <label for="reg-password">Password <span class="required-mark" aria-hidden="true">*</span></label>
             <div class="password-wrapper">
-              <input class="input" type="password" id="reg-password" placeholder="Min. 8 characters" minlength="8" required />
+              <input class="input" type="password" id="reg-password" placeholder="Min. 8 characters" minlength="8" required aria-describedby="reg-password-error" />
               <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="reg-password">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
+            <div class="form-error-msg" id="reg-password-error" role="alert" aria-live="polite"></div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+          <button type="submit" class="btn btn-primary btn-block" id="reg-submit-btn">
+            <span class="btn-spinner" id="reg-spinner" hidden aria-hidden="true"></span>
+            <span id="reg-btn-text">Create Account</span>
+          </button>
           <p class="form-link">Already have an account? <a href="#" id="switch-to-login">Sign in</a></p>
+        </form>
+      </div>
+
+      <!-- Email Verification Panel -->
+      <div class="auth-panel" id="panel-verify" role="tabpanel" aria-labelledby="verify-modal-title">
+        <div class="verify-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
+        <h3 class="verify-title" id="verify-modal-title">Verify University Email</h3>
+        <p class="verify-subtext">We've sent a 6-digit verification code to <strong id="verify-target-email">your email</strong>. Enter the code below to complete student registration.</p>
+
+        <div class="verify-demo-note" role="note">
+          Demo verification code: <strong id="demo-code-display">482910</strong>
+        </div>
+
+        <form class="modal-form" id="verify-form" novalidate>
+          <div class="form-group">
+            <label for="verify-code">6-Digit Verification Code</label>
+            <input class="input verify-code-input" type="text" id="verify-code" maxlength="6" inputmode="numeric" placeholder="482910" required aria-describedby="verify-code-error" />
+            <div class="form-error-msg" id="verify-code-error" role="alert" aria-live="polite"></div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="verify-submit-btn">
+            <span class="btn-spinner" id="verify-spinner" hidden aria-hidden="true"></span>
+            <span id="verify-btn-text">Verify &amp; Activate Account</span>
+          </button>
+          <p class="form-link">Didn't receive the code? <a href="#" id="resend-code-btn">Resend code</a> or <a href="#" id="back-to-reg-btn">Change email</a></p>
         </form>
       </div>
 
@@ -118,19 +155,24 @@
       <div class="auth-panel" id="panel-login" role="tabpanel" aria-labelledby="tab-login">
         <form class="modal-form" id="login-form" novalidate>
           <div class="form-group">
-            <label for="login-email">University Email</label>
-            <input class="input" type="email" id="login-email" placeholder="you@university.edu" required />
+            <label for="login-email">University Email <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="email" id="login-email" placeholder="e.g. yourname@student.oauife.edu.ng" required aria-describedby="login-email-error" />
+            <div class="form-error-msg" id="login-email-error" role="alert" aria-live="polite"></div>
           </div>
           <div class="form-group">
-            <label for="login-password">Password</label>
+            <label for="login-password">Password <span class="required-mark" aria-hidden="true">*</span></label>
             <div class="password-wrapper">
-              <input class="input" type="password" id="login-password" placeholder="Enter your password" required />
+              <input class="input" type="password" id="login-password" placeholder="Enter your password" required aria-describedby="login-password-error" />
               <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-target="login-password">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
+            <div class="form-error-msg" id="login-password-error" role="alert" aria-live="polite"></div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+          <button type="submit" class="btn btn-primary btn-block" id="login-submit-btn">
+            <span class="btn-spinner" id="login-spinner" hidden aria-hidden="true"></span>
+            <span id="login-btn-text">Sign In</span>
+          </button>
           <p class="form-link">Don't have an account? <a href="#" id="switch-to-register">Register</a></p>
         </form>
       </div>
@@ -177,41 +219,103 @@
       </div>
     </section>
 
-    <!-- Impact Highlights Strip -->
-    <section class="container container--narrow impact-section" aria-label="Campus Pulse Impact Highlights">
+    <!-- How It Works Section -->
+    <section class="container container--narrow how-it-works-section reveal" data-anim="up" style="--d:.2s" aria-labelledby="how-it-works-heading">
+      <div class="section-badge-wrapper">
+        <span class="section-badge">Simple &amp; Transparent</span>
+      </div>
+      <h2 class="section-title" id="how-it-works-heading">How CamPulse Works</h2>
+      <p class="section-subtitle">From reporting a campus issue to verified resolution in three straightforward steps.</p>
+
+      <div class="steps-grid">
+        <!-- Step 1 -->
+        <div class="step-card reveal" data-anim="left" style="--d:.2s">
+          <div class="step-badge">1</div>
+          <div class="step-icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </div>
+          <h3 class="step-title">Submit</h3>
+          <p class="step-desc">File your complaint or feedback anonymously or with your student ID in under 2 minutes.</p>
+        </div>
+
+        <!-- Connector Arrow -->
+        <div class="step-connector" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step-card reveal" data-anim="up" style="--d:.3s">
+          <div class="step-badge">2</div>
+          <div class="step-icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <h3 class="step-title">Track</h3>
+          <p class="step-desc">Follow live status updates, department assignments, and official staff responses on your dashboard.</p>
+        </div>
+
+        <!-- Connector Arrow -->
+        <div class="step-connector" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step-card reveal" data-anim="right" style="--d:.4s">
+          <div class="step-badge">3</div>
+          <div class="step-icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+          <h3 class="step-title">Resolved</h3>
+          <p class="step-desc">Get your issue officially fixed by university staff and rate your resolution satisfaction.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dynamic Impact Highlights (only shown when >= 20 real tickets exist in DB) -->
+    <section class="container container--narrow impact-section" id="live-stats-strip" aria-label="Campus Pulse Impact Highlights" hidden>
       <div class="impact-grid">
-        <div class="reveal impact-card" data-anim="left" style="--d:.2s">
+        <div class="impact-card">
           <div class="impact-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           </div>
           <div class="impact-info">
-            <span class="impact-number"><span class="count" data-to="1400">0</span>+</span>
+            <span class="impact-number"><span class="count" id="stat-live-count" data-to="0">0</span>+</span>
             <span class="impact-label">Student Voices Heard</span>
           </div>
         </div>
 
-        <div class="reveal impact-card" data-anim="left" style="--d:.4s">
+        <div class="impact-card">
           <div class="impact-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
           </div>
           <div class="impact-info">
-            <span class="impact-number"><span class="count" data-to="98">0</span>%</span>
+            <span class="impact-number"><span class="count" id="stat-live-rate" data-to="0">0</span>%</span>
             <span class="impact-label">Resolution Rate</span>
           </div>
         </div>
 
-        <div class="reveal impact-card" data-anim="right" style="--d:.5s">
+        <div class="impact-card">
           <div class="impact-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
           </div>
           <div class="impact-info">
-            <span class="impact-number"><span class="count" data-to="24">0</span>h</span>
+            <span class="impact-number"><span class="count" id="stat-live-time" data-to="0">0</span>h</span>
             <span class="impact-label">Avg. Response Time</span>
           </div>
         </div>
@@ -226,8 +330,8 @@
         <form id="complaint-form" novalidate>
           <!-- Category -->
           <div class="form-group">
-            <label for="category">Issue Category</label>
-            <select class="select" id="category" name="category" required>
+            <label for="category">Issue Category <span class="required-mark" aria-hidden="true">*</span></label>
+            <select class="select" id="category" name="category" required aria-describedby="category-helper category-error">
               <option value="" disabled selected>Select a category…</option>
               <option value="Academic">Academic Issues</option>
               <option value="Facilities">Facilities &amp; Infrastructure</option>
@@ -239,22 +343,25 @@
               <option value="Administration">Administration</option>
               <option value="Other">Other</option>
             </select>
-            <p class="helper">Choose the area that best matches your concern.</p>
+            <p class="helper" id="category-helper">Choose the campus department that best matches your concern.</p>
+            <div class="form-error-msg" id="category-error" role="alert" aria-live="polite"></div>
           </div>
 
           <!-- Subject -->
           <div class="form-group">
-            <label for="subject">Subject</label>
-            <input class="input" type="text" id="subject" name="subject" placeholder="Brief title for your complaint…" maxlength="120" required />
+            <label for="subject">Subject <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="input" type="text" id="subject" name="subject" placeholder="Brief title for your complaint (e.g. Broken reading desk at library)…" maxlength="120" required aria-describedby="subject-error" />
+            <div class="form-error-msg" id="subject-error" role="alert" aria-live="polite"></div>
           </div>
 
           <!-- Description -->
           <div class="form-group">
-            <label for="description">Detailed Description</label>
-            <textarea class="textarea" id="description" name="description" placeholder="Describe the issue in detail — what happened, when, and where…" maxlength="2000" required></textarea>
+            <label for="description">Detailed Description <span class="required-mark" aria-hidden="true">*</span></label>
+            <textarea class="textarea" id="description" name="description" placeholder="Describe the issue in detail — what happened, location, and key details…" maxlength="2000" required aria-describedby="char-counter description-error"></textarea>
             <div class="char-counter" id="char-counter" aria-live="polite">
               <span id="char-count">0</span> / 2000
             </div>
+            <div class="form-error-msg" id="description-error" role="alert" aria-live="polite"></div>
           </div>
 
           <!-- Urgency Toggle -->
@@ -267,15 +374,16 @@
                 This issue is <span class="urgency-state" id="urgency-state">Normal</span>
               </span>
             </div>
-            <p class="helper">Toggle on if this requires immediate attention.</p>
+            <p class="helper">Toggle on if this requires immediate university attention.</p>
           </div>
 
           <!-- Submit -->
           <button type="submit" class="btn btn-primary btn-lg btn-block" id="submit-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <span class="btn-spinner" id="submit-spinner" hidden aria-hidden="true"></span>
+            <svg id="submit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
-            Submit Complaint
+            <span id="submit-text">Submit Complaint</span>
           </button>
         </form>
 

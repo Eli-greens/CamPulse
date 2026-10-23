@@ -317,6 +317,12 @@ a:hover { color: var(--clr-primary-800); }
   height: 64px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -481,11 +487,30 @@ a:hover { color: var(--clr-primary-800); }
   background: none;
   border: none;
   cursor: pointer;
-  padding: var(--sp-2);
+  padding: 6px;
+  margin-left: -6px;
   color: var(--clr-gray-700);
+  border-radius: var(--radius-md);
+  transition: background var(--dur-fast), color var(--dur-fast);
+  align-items: center;
+  justify-content: center;
 }
 
-.menu-toggle svg { width: 24px; height: 24px; }
+.menu-toggle:hover {
+  background: var(--clr-gray-100);
+  color: var(--clr-gray-900);
+}
+
+.menu-toggle:focus-visible {
+  outline: 2px solid var(--clr-primary-500);
+  outline-offset: 2px;
+}
+
+.menu-toggle svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
 
 /* ---------- Hero / Page Header ---------- */
 .page-hero {
@@ -1207,8 +1232,45 @@ a:hover { color: var(--clr-primary-800); }
    RESPONSIVE BREAKPOINTS
    =================================================================== */
 
-/* Tablet — 768px */
+/* Tablet & Mobile — 768px */
 @media (max-width: 768px) {
+  .menu-toggle {
+    display: inline-flex;
+  }
+
+  .nav-links {
+    position: fixed;
+    top: 64px;
+    left: 0; right: 0;
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    flex-direction: column;
+    padding: var(--sp-4);
+    gap: var(--sp-1);
+    border-bottom: 1px solid var(--clr-gray-200);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-120%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform var(--dur-base) var(--ease-out),
+                opacity var(--dur-base) var(--ease-out);
+    z-index: 99;
+  }
+
+  .nav-links.open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .nav-links a {
+    width: 100%;
+    justify-content: center;
+    padding: var(--sp-3);
+    border-radius: var(--radius-md);
+  }
+
   .page-hero h1 {
     font-size: var(--fs-3xl);
   }
@@ -1252,36 +1314,21 @@ a:hover { color: var(--clr-primary-800); }
   .header-inner { height: 56px; }
 
   .nav-links {
-    position: fixed;
     top: 56px;
-    left: 0; right: 0;
-    background: rgba(255,255,255,.95);
-    backdrop-filter: blur(14px);
-    flex-direction: column;
-    padding: var(--sp-4);
-    gap: var(--sp-1);
-    border-bottom: 1px solid var(--clr-gray-200);
-    transform: translateY(-120%);
-    opacity: 0;
-    transition: transform var(--dur-base) var(--ease-out),
-                opacity var(--dur-base) var(--ease-out);
-    z-index: 99;
   }
 
-  .nav-links.open {
-    transform: translateY(0);
-    opacity: 1;
+  .nav-auth-btn {
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--fs-xs);
   }
 
-  .nav-links a {
-    width: 100%;
-    justify-content: center;
-    padding: var(--sp-3);
-    border-radius: var(--radius-md);
+  .brand-text {
+    font-size: var(--fs-lg);
   }
 
-  .menu-toggle {
-    display: block;
+  .brand-icon {
+    width: 30px;
+    height: 30px;
   }
 
   .page-hero {
@@ -1352,67 +1399,82 @@ a:hover { color: var(--clr-primary-800); }
    AUTH MODAL
    =================================================================== */
 
-/* Body lock when modal is open */
+/* Body/HTML lock when modal is open */
+html.modal-open,
 body.modal-open {
-  overflow: hidden;
+  overflow: hidden !important;
+  height: 100% !important;
   overscroll-behavior: none;
 }
 
-/* Overlay */
+/* 1. Dark background overlay: exact specifications */
 .modal-overlay {
   position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15,23,42,.45);
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   opacity: 0;
   visibility: hidden;
-  overscroll-behavior: contain;
+  pointer-events: none;
   transition: opacity var(--dur-slow) var(--ease-out),
-              visibility var(--dur-slow),
-              backdrop-filter var(--dur-slow);
-  padding: var(--sp-6);
+              visibility var(--dur-slow);
 }
 
 .modal-overlay.open {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
 }
 
-/* Panel */
+/* 2. Modal form container: exact specifications */
 .modal-panel {
-  width: 100%;
+  position: fixed;
+  z-index: 1000;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
   max-width: 460px;
-  max-height: 85vh;
-  max-height: 85dvh;
+  max-height: 80vh;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   background: var(--clr-white);
   border-radius: var(--radius-2xl);
-  box-shadow: 0 25px 50px -12px rgba(0,0,0,.18),
-              0 0 0 1px rgba(255,255,255,.1);
-  transform: translateY(32px) scale(.94);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
+              0 0 0 1px rgba(0, 0, 0, 0.08);
   opacity: 0;
-  transition: transform 500ms var(--ease-spring),
-              opacity var(--dur-slow) var(--ease-out);
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out),
+              visibility var(--dur-base);
 }
 
 .modal-overlay.open .modal-panel {
-  transform: translateY(0) scale(1);
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
 }
 
 /* Modal header */
 .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--clr-white);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-6) var(--sp-6) 0;
+  padding: var(--sp-6) var(--sp-6) var(--sp-2);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
 }
 
 .modal-header h2 {
@@ -1643,27 +1705,16 @@ body.modal-open {
 
 /* ---------- Auth Modal Responsive ---------- */
 @media (max-width: 480px) {
-  .modal-overlay {
-    padding: var(--sp-4);
-    align-items: flex-end;
-  }
-
   .modal-panel {
-    max-width: 100%;
+    width: calc(100% - 24px);
+    max-width: 420px;
     max-height: 85vh;
     max-height: 85dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-radius: var(--radius-xl);
   }
 
   .modal-overlay.open .modal-panel {
-    transform: translateY(0) scale(1);
-  }
-
-  .modal-panel:not(.modal-overlay.open .modal-panel) {
-    transform: translateY(100%);
+    transform: translate(-50%, -50%);
   }
 
   .auth-tabs {

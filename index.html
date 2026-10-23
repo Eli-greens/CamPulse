@@ -21,18 +21,20 @@
   <!-- ===== HEADER ===== -->
   <header class="site-header" id="site-header">
     <div class="container header-inner">
-      <a href="index.html" class="brand" aria-label="CamPulse Home">
-        <img src="favicon.png" alt="CamPulse Logo" class="brand-icon" width="36" height="36" />
-        <div class="brand-text">Cam<span>Pulse</span></div>
-      </a>
+      <div class="header-left">
+        <button class="menu-toggle" id="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
 
-      <button class="menu-toggle" id="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="21" y2="12"/>
-          <line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-      </button>
+        <a href="index.html" class="brand" aria-label="CamPulse Home">
+          <img src="favicon.png" alt="CamPulse Logo" class="brand-icon" width="36" height="36" />
+          <div class="brand-text">Cam<span>Pulse</span></div>
+        </a>
+      </div>
 
       <nav aria-label="Main navigation">
         <ul class="nav-links" id="nav-links">

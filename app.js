@@ -363,25 +363,37 @@ function initAuthModal() {
   // Open modal
   function openModal() {
     overlay.classList.add('open');
+    document.documentElement.classList.add('modal-open');
     document.body.classList.add('modal-open');
     document.body.style.overflow = 'hidden';
-    // Focus the first input in the active panel
+    const panel = overlay.querySelector('.modal-panel');
+    if (panel) panel.scrollTop = 0;
+    // Focus the first input in the active panel without triggering unwanted scroll jump
     setTimeout(() => {
       const activePanel = overlay.querySelector('.auth-panel.active');
       const firstInput = activePanel?.querySelector('input');
-      if (firstInput) firstInput.focus();
+      if (firstInput) firstInput.focus({ preventScroll: true });
     }, 300);
   }
 
   // Close modal
   function closeModal() {
     overlay.classList.remove('open');
+    document.documentElement.classList.remove('modal-open');
     document.body.classList.remove('modal-open');
     document.body.style.overflow = '';
   }
 
   openBtn.addEventListener('click', openModal);
   closeBtn.addEventListener('click', closeModal);
+
+  // Prevent wheel event from chaining to background document while scrolling inside modal panel
+  const panel = overlay.querySelector('.modal-panel');
+  if (panel) {
+    panel.addEventListener('wheel', (e) => {
+      e.stopPropagation();
+    }, { passive: true });
+  }
 
   // Close on overlay click (not panel)
   overlay.addEventListener('click', (e) => {

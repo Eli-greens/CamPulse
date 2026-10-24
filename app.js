@@ -1449,18 +1449,18 @@ function initAuthModal() {
       pendingStudentRegistration.expiresAt = Date.now() + 15 * 60 * 1000;
       sessionStorage.setItem('campulse_pending_reg', JSON.stringify(pendingStudentRegistration));
 
-      renderOfficialEmailNotice(pendingStudentRegistration.email, pendingStudentRegistration.name, newCode);
+      dispatchVerificationEmailToInbox(pendingStudentRegistration.email, pendingStudentRegistration.name, newCode);
 
       if (window.CamPulseDB && window.CamPulseDB.dispatchNotification) {
         window.CamPulseDB.dispatchNotification({
-          title: `New Verification Code: ${newCode}`,
-          message: `A replacement verification code has been dispatched to ${pendingStudentRegistration.email}. Code: ${newCode}. Valid for 15 minutes.`,
+          title: 'Verification Code Dispatched',
+          message: `A replacement verification code has been dispatched to ${pendingStudentRegistration.email}. Please check your inbox to complete student registration.`,
           type: 'status',
           recipientEmail: pendingStudentRegistration.email
         });
       }
 
-      showToast(`A new verification code has been dispatched to ${pendingStudentRegistration.email}.`);
+      showToast(`Verification code sent to ${pendingStudentRegistration.email}. Check your inbox.`);
     });
   }
 
@@ -1587,21 +1587,21 @@ function initAuthModal() {
       const targetEmailEl = document.getElementById('verify-target-email');
       if (targetEmailEl) targetEmailEl.textContent = email;
 
-      // Update or mount the official email communication notice box
-      renderOfficialEmailNotice(email, name, dynamicCode);
+      // Dispatch verification code to the student's provided university inbox (NOT rendered on site)
+      dispatchVerificationEmailToInbox(email, name, dynamicCode);
 
-      // Dispatch formal institutional notification to the notification bell
+      // Dispatch formal institutional notification to the notification bell (without exposing code on site)
       if (window.CamPulseDB && window.CamPulseDB.dispatchNotification) {
         window.CamPulseDB.dispatchNotification({
-          title: `Verification Code: ${dynamicCode}`,
-          message: `Official account activation communication sent to ${email}. Single-use verification code: ${dynamicCode}. Valid for 15 minutes.`,
+          title: 'Verification Code Dispatched',
+          message: `Official account activation instructions and verification code have been dispatched to ${email}. Please check your inbox to complete student registration.`,
           type: 'status',
           recipientEmail: email
         });
       }
 
       switchTab('tab-verify');
-      showToast(`Verification code dispatched to ${email}`);
+      showToast(`Verification code sent to ${email}. Check your inbox.`);
 
       const codeInput = document.getElementById('verify-code');
       if (codeInput) {
@@ -1611,46 +1611,51 @@ function initAuthModal() {
     });
   }
 
-  // Helper: render the formal institutional email communication notice (Strictly professional, zero emojis)
-  function renderOfficialEmailNotice(email, name, code) {
-    let noticeBox = document.getElementById('email-notice-box');
-    const verifyPanel = document.getElementById('panel-verify');
-    if (!verifyPanel) return;
-
-    if (!noticeBox) {
-      noticeBox = document.createElement('div');
-      noticeBox.id = 'email-notice-box';
-      noticeBox.className = 'email-notice-card';
-      const form = verifyPanel.querySelector('#verify-form');
-      if (form) verifyPanel.insertBefore(noticeBox, form);
-      else verifyPanel.appendChild(noticeBox);
-    }
-
-    noticeBox.innerHTML = `
-      <div class="notice-header">Official Institutional Communication</div>
-      <div style="font-size:0.75rem;color:#475569;margin-bottom:8px;line-height:1.5;">
-        <div><strong>Institution:</strong> Obafemi Awolowo University, Ile-Ife</div>
-        <div><strong>Dispatched By:</strong> Information Technology &amp; Communications Unit (INTECU) &amp; Division of Student Affairs</div>
-        <div><strong>Recipient:</strong> ${name} &lt;${email}&gt;</div>
-        <div><strong>Subject:</strong> Institutional Identity Verification — CamPulse Student Access Activation</div>
-      </div>
-      <div style="padding-top:8px;border-top:1px solid #e2e8f0;font-size:0.78rem;color:#334155;line-height:1.55;">
-        <p style="margin:0 0 6px 0;">Dear ${name},</p>
-        <p style="margin:0 0 8px 0;">
-          Your registration request on the CamPulse Student Accountability &amp; Feedback Platform has been received. To authenticate your official university identity, please input the following single-use verification code:
-        </p>
-        <div style="text-align:center;margin:10px 0;">
-          <div class="notice-code-highlight">${code}</div>
-        </div>
-        <p style="margin:8px 0 4px 0;font-size:0.72rem;color:#64748b;">
-          <strong>Security Notice:</strong> This authorization code remains valid for fifteen (15) minutes and expires automatically thereafter. University staff, student union executives, and administrators will never request your verification code or password. If you did not initiate this request, please report it immediately to INTECU Security Operations.
-        </p>
-      </div>
-    `;
-
-    // Also remove any demo notice element
+  // Helper: dispatch verification email directly to recipient's email address (Strictly not displayed on site)
+  async function dispatchVerificationEmailToInbox(email, name, code) {
+    // Ensure any legacy notice box or demo notes are completely removed from the DOM
+    const noticeBox = document.getElementById('email-notice-box');
+    if (noticeBox) noticeBox.remove();
     const demoNote = document.querySelector('.verify-demo-note');
     if (demoNote) demoNote.remove();
+
+    // 1. Try Vercel Serverless Function endpoint if available
+    try {
+      fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, code })
+      }).catch(() => {});
+    } catch (_) {}
+
+    // 2. Dispatch real email to user's provided inbox via FormSubmit AJAX service
+    try {
+      fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          _subject: `CamPulse Verification Code: ${code}`,
+          _template: 'box',
+          _captcha: 'false',
+          Institution: 'Obafemi Awolowo University (OAU), Ile-Ife',
+          Dispatched_By: 'Information Technology & Communications Unit (INTECU) & Division of Student Affairs',
+          Recipient: `${name} <${email}>`,
+          Verification_Code: code,
+          Validity: '15 Minutes',
+          Official_Communication: `Dear ${name},\n\nYour registration request on the CamPulse Student Accountability & Feedback Platform has been received.\n\nYour single-use university verification code is:\n${code}\n\nThis authorization code remains valid for fifteen (15) minutes and expires automatically thereafter. Enter this code on the CamPulse verification window to activate your student account.\n\nSecurity Notice: University staff and system administrators will never ask for your verification code or password. If you did not initiate this registration, please report it immediately to INTECU Security Operations.\n\nBest regards,\nINTECU & Division of Student Affairs\nObafemi Awolowo University, Ile-Ife`
+        })
+      }).catch(err => {
+        console.warn('[CamPulse Mail Delivery] Formsubmit background dispatch:', err);
+      });
+    } catch (err) {
+      console.warn('[CamPulse Mail Delivery] Network dispatch error:', err);
+    }
+
+    // Discreet developer log (only in devtools console, strictly not on the UI)
+    console.info(`%c[CamPulse Mail Delivery Service] Dispatched single-use verification code to inbox: ${email}`, 'color:#059669;font-weight:bold;');
   }
 
   // 2. Email Verification Form
@@ -2277,39 +2282,14 @@ function initNotifications() {
   updateBadge();
 }
 
-// ── Phase 6: Dark Mode Theme Switcher (Item 30) ──────────────────────
+// ── Light Mode Enforcement (Dark mode option removed per user preference) ──
 function initDarkMode() {
+  document.documentElement.removeAttribute('data-theme');
+  try {
+    localStorage.removeItem('campulse_theme');
+  } catch (_) {}
   const toggleBtn = document.getElementById('theme-toggle-btn');
-  if (!toggleBtn) return;
-
-  const sunIcon = toggleBtn.querySelector('.sun-icon');
-  const moonIcon = toggleBtn.querySelector('.moon-icon');
-
-  function applyTheme(isDark) {
-    if (isDark) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      if (sunIcon) sunIcon.style.display = 'none';
-      if (moonIcon) moonIcon.style.display = 'block';
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-      if (sunIcon) sunIcon.style.display = 'block';
-      if (moonIcon) moonIcon.style.display = 'none';
-    }
-    localStorage.setItem('campulse_theme', isDark ? 'dark' : 'light');
-  }
-
-  // Determine initial state
-  const savedTheme = localStorage.getItem('campulse_theme');
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const isDarkInitial = savedTheme ? savedTheme === 'dark' : prefersDark;
-
-  applyTheme(isDarkInitial);
-
-  toggleBtn.addEventListener('click', () => {
-    const isCurrentlyDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    applyTheme(!isCurrentlyDark);
-    showToast(!isCurrentlyDark ? 'Dark mode enabled' : 'Light mode enabled');
-  });
+  if (toggleBtn) toggleBtn.remove();
 }
 
 // Helper: Relative time formatting

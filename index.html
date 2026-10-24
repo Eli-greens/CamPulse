@@ -215,15 +215,11 @@
         <p class="verify-subtext">We've sent a 6-digit verification code to <strong id="verify-target-email">your
             email</strong>. Enter the code below to complete student registration.</p>
 
-        <div class="verify-demo-note" role="note">
-          Demo verification code: <strong id="demo-code-display">482910</strong>
-        </div>
-
         <form class="modal-form" id="verify-form" novalidate>
           <div class="form-group">
             <label for="verify-code">6-Digit Verification Code</label>
             <input class="input verify-code-input" type="text" id="verify-code" maxlength="6" inputmode="numeric"
-              placeholder="482910" required aria-describedby="verify-code-error" />
+              placeholder="Enter 6-digit code" required aria-describedby="verify-code-error" />
             <div class="form-error-msg" id="verify-code-error" role="alert" aria-live="polite"></div>
           </div>
           <button type="submit" class="btn btn-primary btn-block" id="verify-submit-btn">
@@ -547,7 +543,9 @@
             </select>
             <p class="helper" id="category-helper">Choose the campus department that best matches your concern.</p>
             <div class="category-suggestion-badge" id="category-suggestion-badge" hidden>
-              <span class="suggestion-icon" aria-hidden="true">💡</span>
+              <span class="suggestion-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 2v1M12 21v1M4.22 4.22l.71.71M18.36 18.36l.71.71M1 12h1M21 12h1M4.22 19.78l.71-.71M18.36 5.64l.71-.71M12 6a6 6 0 0 0-6 6c0 2.22 1.21 4.16 3 5.2V19a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1.8c1.79-1.04 3-2.98 3-5.2a6 6 0 0 0-6-6z"/></svg>
+              </span>
               <span>AI Suggestion: <strong id="suggested-category-name">Facilities</strong></span>
               <button type="button" class="btn-suggestion-apply" id="apply-category-btn">Apply</button>
             </div>
@@ -769,7 +767,7 @@
             The university student complaint &amp; feedback accountability platform. Giving every student voice transparency, speed, and real change.
           </p>
           <div class="footer-institution">
-            <span>🏛️ Obafemi Awolowo University, Ile-Ife</span>
+            <span>Obafemi Awolowo University, Ile-Ife</span>
           </div>
         </div>
 

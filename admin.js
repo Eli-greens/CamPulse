@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const overHours = Math.abs(Math.round(remaining));
       return {
         badgeClass: 'overdue',
-        label: `🚨 Overdue (+${overHours}h)`,
+        label: `Overdue (+${overHours}h)`,
         isOverdue: true,
         remainingHours: remaining
       };
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (remaining <= 12) {
       return {
         badgeClass: 'warning',
-        label: `⚠️ ${Math.round(remaining)}h left`,
+        label: `${Math.round(remaining)}h left`,
         isOverdue: false,
         remainingHours: remaining
       };
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     return {
       badgeClass: 'ontime',
-      label: `⏱️ ${Math.round(remaining)}h remaining`,
+      label: `${Math.round(remaining)}h remaining`,
       isOverdue: false,
       remainingHours: remaining
     };
@@ -420,7 +420,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       drawerAttachmentsList.innerHTML = atts.map(att => `
         <a href="${att.url}" target="_blank" class="attachment-chip" style="font-size:0.75rem;padding:0.35rem 0.6rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
-          📎 ${att.name}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          ${att.name}
         </a>
       `).join('');
     }

@@ -16,11 +16,18 @@ const APP_CONFIG = {
   UNIVERSITY_NAME: 'Obafemi Awolowo University (OAU)',
   ALLOWED_EMAIL_DOMAINS: ['@student.oauife.edu.ng'],
   MIN_PASSWORD_LENGTH: 8,
-  STATS_MIN_TICKETS: 20,
-  DEMO_OTP: '482910'
+  STATS_MIN_TICKETS: 20
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+/** Format byte size to human readable */
+function formatBytes(bytes) {
+  if (typeof bytes !== 'number' || isNaN(bytes) || bytes <= 0) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
 
 /** Check if an email matches the approved university domains */
 function isAllowedUniversityEmail(email) {
@@ -725,9 +732,9 @@ function initDashboard() {
           <h3><a href="ticket.html?id=${encodeURIComponent(ticket.id)}" style="color:inherit;text-decoration:none;">${ticket.subject}</a></h3>
           <p>${ticket.description}</p>
           <div class="ticket-card-chips">
-            ${ticket.locationZone ? `<span class="card-chip">📍 ${ticket.locationZone}</span>` : ''}
-            ${attachCount > 0 ? `<span class="card-chip">📎 ${attachCount} Evidence ${attachCount === 1 ? 'file' : 'files'}</span>` : ''}
-            ${commentCount > 0 ? `<span class="card-chip">💬 ${commentCount} ${commentCount === 1 ? 'reply' : 'replies'}</span>` : ''}
+            ${ticket.locationZone ? `<span class="card-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${ticket.locationZone}</span>` : ''}
+            ${attachCount > 0 ? `<span class="card-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> ${attachCount} Evidence ${attachCount === 1 ? 'file' : 'files'}</span>` : ''}
+            ${commentCount > 0 ? `<span class="card-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> ${commentCount} ${commentCount === 1 ? 'reply' : 'replies'}</span>` : ''}
           </div>
         </div>
         <div class="ticket-footer">
@@ -777,6 +784,11 @@ function initDashboard() {
   }
 
   renderTickets();
+  renderDashboardProfile();
+
+  window.addEventListener('campulse:user-updated', () => {
+    renderDashboardProfile();
+  });
 }
 
 // ── Ticket Detail Page (ticket.html) with Timeline, Comments & Rating ─
@@ -887,7 +899,15 @@ async function initTicketDetail() {
       reopenCount: 0
     };
   } else if (ticketIdParam) {
-    ticket = await window.CamPulseDB.fetchTicketById(ticketIdParam);
+    try {
+      ticket = await window.CamPulseDB.fetchTicketById(ticketIdParam);
+      if (!ticket) {
+        const allTickets = await window.CamPulseDB.fetchAllTickets();
+        ticket = allTickets.find(t => t.id && t.id.toLowerCase() === ticketIdParam.trim().toLowerCase()) || null;
+      }
+    } catch (fetchErr) {
+      console.warn('[CamPulse] Error fetching ticket by ID:', fetchErr);
+    }
   }
 
   // Not found
@@ -899,6 +919,7 @@ async function initTicketDetail() {
 
   // Found: hide loading, show content
   if (loadingEl) loadingEl.hidden = true;
+  if (notFoundEl) notFoundEl.hidden = true;
   detailContainer.hidden = false;
 
   // Breadcrumb
@@ -1418,8 +1439,28 @@ function initAuthModal() {
   if (resendCodeBtn) {
     resendCodeBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      const targetEmail = pendingStudentRegistration?.email || 'your email';
-      showToast(`New code sent to ${targetEmail} (Code: ${APP_CONFIG.DEMO_OTP})`);
+      if (!pendingStudentRegistration) {
+        showToast('Please initiate registration first.');
+        switchTab('tab-register');
+        return;
+      }
+      const newCode = String(Math.floor(100000 + Math.random() * 900000));
+      pendingStudentRegistration.code = newCode;
+      pendingStudentRegistration.expiresAt = Date.now() + 15 * 60 * 1000;
+      sessionStorage.setItem('campulse_pending_reg', JSON.stringify(pendingStudentRegistration));
+
+      renderOfficialEmailNotice(pendingStudentRegistration.email, pendingStudentRegistration.name, newCode);
+
+      if (window.CamPulseDB && window.CamPulseDB.dispatchNotification) {
+        window.CamPulseDB.dispatchNotification({
+          title: `New Verification Code: ${newCode}`,
+          message: `A replacement verification code has been dispatched to ${pendingStudentRegistration.email}. Code: ${newCode}. Valid for 15 minutes.`,
+          type: 'status',
+          recipientEmail: pendingStudentRegistration.email
+        });
+      }
+
+      showToast(`A new verification code has been dispatched to ${pendingStudentRegistration.email}.`);
     });
   }
 
@@ -1523,8 +1564,20 @@ function initAuthModal() {
 
       await new Promise(r => setTimeout(r, 450));
 
+      // Generate genuine random 6-digit verification code
+      const dynamicCode = String(Math.floor(100000 + Math.random() * 900000));
+
       // Store pending registration & transition to verification screen
-      pendingStudentRegistration = { name, matric, email, password, role: 'student' };
+      pendingStudentRegistration = {
+        name,
+        matric,
+        email,
+        password,
+        role: 'student',
+        code: dynamicCode,
+        expiresAt: Date.now() + 15 * 60 * 1000
+      };
+      sessionStorage.setItem('campulse_pending_reg', JSON.stringify(pendingStudentRegistration));
 
       regSubmitBtn.classList.remove('btn-loading');
       regSubmitBtn.removeAttribute('aria-busy');
@@ -1534,8 +1587,21 @@ function initAuthModal() {
       const targetEmailEl = document.getElementById('verify-target-email');
       if (targetEmailEl) targetEmailEl.textContent = email;
 
+      // Update or mount the official email communication notice box
+      renderOfficialEmailNotice(email, name, dynamicCode);
+
+      // Dispatch formal institutional notification to the notification bell
+      if (window.CamPulseDB && window.CamPulseDB.dispatchNotification) {
+        window.CamPulseDB.dispatchNotification({
+          title: `Verification Code: ${dynamicCode}`,
+          message: `Official account activation communication sent to ${email}. Single-use verification code: ${dynamicCode}. Valid for 15 minutes.`,
+          type: 'status',
+          recipientEmail: email
+        });
+      }
+
       switchTab('tab-verify');
-      showToast(`Verification code sent to ${email}`);
+      showToast(`Verification code dispatched to ${email}`);
 
       const codeInput = document.getElementById('verify-code');
       if (codeInput) {
@@ -1543,6 +1609,48 @@ function initAuthModal() {
         setTimeout(() => codeInput.focus(), 150);
       }
     });
+  }
+
+  // Helper: render the formal institutional email communication notice (Strictly professional, zero emojis)
+  function renderOfficialEmailNotice(email, name, code) {
+    let noticeBox = document.getElementById('email-notice-box');
+    const verifyPanel = document.getElementById('panel-verify');
+    if (!verifyPanel) return;
+
+    if (!noticeBox) {
+      noticeBox = document.createElement('div');
+      noticeBox.id = 'email-notice-box';
+      noticeBox.className = 'email-notice-card';
+      const form = verifyPanel.querySelector('#verify-form');
+      if (form) verifyPanel.insertBefore(noticeBox, form);
+      else verifyPanel.appendChild(noticeBox);
+    }
+
+    noticeBox.innerHTML = `
+      <div class="notice-header">Official Institutional Communication</div>
+      <div style="font-size:0.75rem;color:#475569;margin-bottom:8px;line-height:1.5;">
+        <div><strong>Institution:</strong> Obafemi Awolowo University, Ile-Ife</div>
+        <div><strong>Dispatched By:</strong> Information Technology &amp; Communications Unit (INTECU) &amp; Division of Student Affairs</div>
+        <div><strong>Recipient:</strong> ${name} &lt;${email}&gt;</div>
+        <div><strong>Subject:</strong> Institutional Identity Verification — CamPulse Student Access Activation</div>
+      </div>
+      <div style="padding-top:8px;border-top:1px solid #e2e8f0;font-size:0.78rem;color:#334155;line-height:1.55;">
+        <p style="margin:0 0 6px 0;">Dear ${name},</p>
+        <p style="margin:0 0 8px 0;">
+          Your registration request on the CamPulse Student Accountability &amp; Feedback Platform has been received. To authenticate your official university identity, please input the following single-use verification code:
+        </p>
+        <div style="text-align:center;margin:10px 0;">
+          <div class="notice-code-highlight">${code}</div>
+        </div>
+        <p style="margin:8px 0 4px 0;font-size:0.72rem;color:#64748b;">
+          <strong>Security Notice:</strong> This authorization code remains valid for fifteen (15) minutes and expires automatically thereafter. University staff, student union executives, and administrators will never request your verification code or password. If you did not initiate this request, please report it immediately to INTECU Security Operations.
+        </p>
+      </div>
+    `;
+
+    // Also remove any demo notice element
+    const demoNote = document.querySelector('.verify-demo-note');
+    if (demoNote) demoNote.remove();
   }
 
   // 2. Email Verification Form
@@ -1564,9 +1672,28 @@ function initAuthModal() {
         return;
       }
 
-      // Accept the demo OTP or any 6-digit code for testing
-      if (code !== APP_CONFIG.DEMO_OTP && code.length !== 6) {
-        setModalError(codeInput, 'verify-code-error', `Invalid code. For this prototype, use code: ${APP_CONFIG.DEMO_OTP}`);
+      // Check session
+      if (!pendingStudentRegistration || !pendingStudentRegistration.code) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem('campulse_pending_reg'));
+          if (saved && saved.code) pendingStudentRegistration = saved;
+        } catch (_) {}
+      }
+
+      if (!pendingStudentRegistration || !pendingStudentRegistration.code) {
+        setModalError(codeInput, 'verify-code-error', 'Registration session expired. Please register again.');
+        return;
+      }
+
+      if (Date.now() > pendingStudentRegistration.expiresAt) {
+        setModalError(codeInput, 'verify-code-error', 'This verification code has expired. Please click "Resend code".');
+        codeInput.focus();
+        return;
+      }
+
+      // Strict validation against real generated code - NO DEMO CODE BYPASS
+      if (code !== pendingStudentRegistration.code) {
+        setModalError(codeInput, 'verify-code-error', 'Invalid verification code. Please check your official email communication and enter the 6-digit code.');
         codeInput.focus();
         return;
       }
@@ -1580,27 +1707,39 @@ function initAuthModal() {
       await new Promise(r => setTimeout(r, 450));
 
       const verifiedUser = {
-        ...(pendingStudentRegistration || {
-          name: 'Student',
-          matric: 'CSC/2021/042',
-          email: 'student@student.oauife.edu.ng'
-        }),
+        id: 'stu-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+        name: pendingStudentRegistration.name,
+        matric: pendingStudentRegistration.matric,
+        email: pendingStudentRegistration.email,
+        role: 'student',
         verified: true,
+        department: '',
+        faculty: '',
+        level: '100 Level',
+        hostel: '',
+        phone: '',
+        bio: '',
+        avatarUrl: null,
         createdAt: new Date().toISOString()
       };
 
       localStorage.setItem('campulse_user', JSON.stringify(verifiedUser));
+      sessionStorage.removeItem('campulse_pending_reg');
 
       verifySubmitBtn.classList.remove('btn-loading');
       verifySubmitBtn.removeAttribute('aria-busy');
       if (verifySpinner) verifySpinner.hidden = true;
       if (verifyBtnText) verifyBtnText.textContent = 'Verify & Activate Account';
 
-      showToast(`Account verified! Welcome to CamPulse, ${verifiedUser.name}!`);
+      showToast(`Account verified successfully! Welcome to CamPulse, ${verifiedUser.name}!`);
       closeModal();
       registerForm?.reset();
       verifyForm?.reset();
       switchTab('tab-login');
+
+      // Update UI immediately
+      initUserAuthDisplay();
+      if (typeof renderDashboardProfile === 'function') renderDashboardProfile();
     });
   }
 
@@ -1644,15 +1783,41 @@ function initAuthModal() {
       if (loginSpinner) loginSpinner.hidden = true;
       if (loginBtnText) loginBtnText.textContent = 'Sign In';
 
-      const stored = JSON.parse(localStorage.getItem('campulse_user') || '{}');
+      let stored = {};
+      try {
+        stored = JSON.parse(localStorage.getItem('campulse_user') || '{}');
+      } catch (_) {}
+
+      let loggedUser = stored;
       if (stored.email && stored.email.toLowerCase() === email.toLowerCase()) {
         showToast(`Welcome back, ${stored.name}!`);
       } else {
-        showToast('Signed in successfully!');
+        const emailName = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        loggedUser = {
+          id: stored.id || ('stu-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)),
+          name: stored.name || emailName,
+          matric: stored.matric || 'CSC/2021/042',
+          email: email,
+          role: 'student',
+          verified: true,
+          department: stored.department || 'Computer Science & Engineering',
+          faculty: stored.faculty || 'Faculty of Technology',
+          level: stored.level || '300 Level',
+          hostel: stored.hostel || 'Fajuyi Hall (Male)',
+          phone: stored.phone || '',
+          bio: stored.bio || 'Computer Science student passionate about campus digital welfare and infrastructure improvements.',
+          avatarUrl: stored.avatarUrl || null,
+          avatarColor: stored.avatarColor || '#059669',
+          createdAt: stored.createdAt || new Date().toISOString()
+        };
+        localStorage.setItem('campulse_user', JSON.stringify(loggedUser));
+        showToast(`Welcome back, ${loggedUser.name}!`);
       }
 
       closeModal();
       loginForm.reset();
+      initUserAuthDisplay();
+      if (typeof renderDashboardProfile === 'function') renderDashboardProfile();
     });
   }
 
@@ -2214,39 +2379,605 @@ function initLegalModals() {
   });
 }
 
-// ── User Authentication State Display in Nav ─────────────────────────
-function initUserAuthDisplay() {
-  const authBtn = document.getElementById('auth-open-btn');
-  if (!authBtn) return;
+// ── User Authentication, Profile Management & Dashboard ──────────────
 
-  const storedUserRaw = localStorage.getItem('campulse_user');
-  if (!storedUserRaw) return;
+function getInitials(name) {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getStoredUser() {
   try {
-    const user = JSON.parse(storedUserRaw);
-    if (user && user.name) {
-      const firstName = user.name.split(' ')[0] || 'Student';
-      const labelSpan = authBtn.querySelector('span');
-      if (labelSpan) {
-        labelSpan.textContent = `${firstName} (Sign Out)`;
-        authBtn.title = `Signed in as ${user.name} (${user.matric || user.email}). Click to sign out.`;
-      }
-      authBtn.addEventListener('click', (e) => {
-        if (localStorage.getItem('campulse_user')) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (confirm(`Signed in as ${user.name} (${user.matric || user.email}). Do you want to sign out?`)) {
-            localStorage.removeItem('campulse_user');
-            showToast('Signed out successfully.');
-            if (labelSpan) labelSpan.textContent = 'Register / Sign In';
-            authBtn.removeAttribute('title');
-            setTimeout(() => window.location.reload(), 400);
-          }
-        }
-      }, { capture: true });
+    const raw = localStorage.getItem('campulse_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Ensure the Profile Customization Modal is in the DOM */
+function ensureProfileModal() {
+  let modal = document.getElementById('profile-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'profile-modal';
+  modal.className = 'modal-overlay';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'profile-modal-title');
+
+  modal.innerHTML = `
+    <div class="modal-panel profile-modal-panel" style="max-width: 640px;">
+      <div class="modal-header">
+        <div>
+          <h2 id="profile-modal-title" style="margin:0;font-size:var(--fs-lg);">Student Profile &amp; Settings</h2>
+          <p style="font-size:0.75rem;color:var(--clr-gray-500);margin:2px 0 0 0;">Manage your student identification, photo, and campus profile</p>
+        </div>
+        <button type="button" class="modal-close" id="profile-close-btn" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="profile-modal-body" style="padding-top:1rem;">
+        <form id="profile-edit-form" novalidate>
+          <!-- Avatar Customizer -->
+          <div class="avatar-customizer-section">
+            <div class="avatar-preview-box" id="avatar-preview-box">
+              <span id="avatar-preview-text">ST</span>
+            </div>
+            <div class="avatar-controls">
+              <span style="font-size:0.8rem;font-weight:700;color:var(--clr-gray-800);">Profile Picture</span>
+              <div class="avatar-btn-row">
+                <label for="profile-avatar-input" class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Upload Photo
+                </label>
+                <input type="file" id="profile-avatar-input" accept="image/jpeg,image/png,image/webp" style="display:none;" />
+                <button type="button" class="btn btn-sm btn-text-action" id="profile-remove-avatar-btn">Remove</button>
+              </div>
+              <div style="font-size:0.7rem;color:var(--clr-gray-500);">Or choose an institutional color theme:</div>
+              <div class="avatar-preset-picker" id="avatar-preset-picker">
+                <button type="button" class="avatar-preset-btn preset-emerald selected" data-color="#059669" title="Emerald Green"></button>
+                <button type="button" class="avatar-preset-btn preset-blue" data-color="#2563eb" title="Royal Blue"></button>
+                <button type="button" class="avatar-preset-btn preset-indigo" data-color="#4338ca" title="Indigo"></button>
+                <button type="button" class="avatar-preset-btn preset-purple" data-color="#7c3aed" title="Purple"></button>
+                <button type="button" class="avatar-preset-btn preset-amber" data-color="#d97706" title="Amber"></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Academic & Personal Details -->
+          <div class="form-grid-2col">
+            <div class="form-group">
+              <label for="prof-name">Full Name <span class="required-mark">*</span></label>
+              <input class="input" type="text" id="prof-name" required placeholder="e.g. Bamidele Adeyemi" />
+            </div>
+
+            <div class="form-group">
+              <label for="prof-matric">Matric / Student ID <span class="required-mark">*</span></label>
+              <input class="input" type="text" id="prof-matric" required placeholder="e.g. CVE/2021/089" />
+            </div>
+          </div>
+
+          <div class="form-grid-2col">
+            <div class="form-group">
+              <label for="prof-email">Institutional Email</label>
+              <input class="input" type="email" id="prof-email" readonly style="background:var(--clr-gray-100);cursor:not-allowed;" />
+            </div>
+
+            <div class="form-group">
+              <label for="prof-phone">Contact Phone</label>
+              <input class="input" type="tel" id="prof-phone" placeholder="e.g. 08012345678" />
+            </div>
+          </div>
+
+          <div class="form-grid-2col">
+            <div class="form-group">
+              <label for="prof-faculty">Faculty</label>
+              <select class="select" id="prof-faculty">
+                <option value="Faculty of Technology">Faculty of Technology</option>
+                <option value="Faculty of Science">Faculty of Science</option>
+                <option value="Faculty of Administration">Faculty of Administration</option>
+                <option value="Faculty of Arts">Faculty of Arts</option>
+                <option value="Faculty of Clinical Sciences">Faculty of Clinical Sciences</option>
+                <option value="Faculty of Dentistry">Faculty of Dentistry</option>
+                <option value="Faculty of Education">Faculty of Education</option>
+                <option value="Faculty of Environmental Design &amp; Mgt">Faculty of Environmental Design &amp; Mgt</option>
+                <option value="Faculty of Law">Faculty of Law</option>
+                <option value="Faculty of Pharmacy">Faculty of Pharmacy</option>
+                <option value="Faculty of Social Sciences">Faculty of Social Sciences</option>
+                <option value="Faculty of Agriculture">Faculty of Agriculture</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="prof-department">Department</label>
+              <input class="input" type="text" id="prof-department" placeholder="e.g. Computer Science &amp; Engineering" />
+            </div>
+          </div>
+
+          <div class="form-grid-2col">
+            <div class="form-group">
+              <label for="prof-level">Academic Level</label>
+              <select class="select" id="prof-level">
+                <option value="100 Level">100 Level</option>
+                <option value="200 Level">200 Level</option>
+                <option value="300 Level">300 Level</option>
+                <option value="400 Level">400 Level</option>
+                <option value="500 Level">500 Level</option>
+                <option value="Postgraduate">Postgraduate</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="prof-hostel">Hall of Residence / Hostel</label>
+              <select class="select" id="prof-hostel">
+                <option value="Fajuyi Hall (Male)">Fajuyi Hall (Male)</option>
+                <option value="Awolowo Hall (Male)">Awolowo Hall (Male)</option>
+                <option value="Angola Hall (Male)">Angola Hall (Male)</option>
+                <option value="ETF Hall (Male)">ETF Hall (Male)</option>
+                <option value="Alumni Hall (Female)">Alumni Hall (Female)</option>
+                <option value="Moremi Hall (Female)">Moremi Hall (Female)</option>
+                <option value="Ladoke Akintola Hall (Female)">Ladoke Akintola Hall (Female)</option>
+                <option value="Mozambique Hall (Female)">Mozambique Hall (Female)</option>
+                <option value="Off-Campus Residence">Off-Campus Residence</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="prof-bio">Bio / Academic Interests</label>
+            <textarea class="textarea" id="prof-bio" rows="2" maxlength="280" placeholder="A brief note about your department focus or campus advocacy interests..."></textarea>
+            <div style="font-size:0.7rem;color:var(--clr-gray-500);text-align:right;">Max 280 characters</div>
+          </div>
+
+          <div class="profile-modal-actions">
+            <button type="button" class="btn btn-secondary" id="profile-cancel-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="profile-save-btn">
+              <span class="btn-spinner" id="profile-spinner" hidden aria-hidden="true"></span>
+              <span id="profile-save-text">Save Profile Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Close handlers
+  const closeBtn = modal.querySelector('#profile-close-btn');
+  const cancelBtn = modal.querySelector('#profile-cancel-btn');
+  closeBtn?.addEventListener('click', closeProfileModal);
+  cancelBtn?.addEventListener('click', closeProfileModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeProfileModal();
+  });
+
+  // Avatar file input handler
+  const avatarInput = modal.querySelector('#profile-avatar-input');
+  const previewBox = modal.querySelector('#avatar-preview-box');
+  const removeAvatarBtn = modal.querySelector('#profile-remove-avatar-btn');
+  const presetBtns = modal.querySelectorAll('.avatar-preset-btn');
+
+  avatarInput?.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      showToast('Avatar image must be smaller than 3MB.');
+      return;
     }
-  } catch (err) {
-    console.error('Failed to parse user auth state:', err);
+    const reader = new FileReader();
+    reader.onload = (re) => {
+      previewBox.innerHTML = `<img src="${re.target.result}" alt="Profile Preview" />`;
+      modal.dataset.tempAvatarUrl = re.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  removeAvatarBtn?.addEventListener('click', () => {
+    modal.dataset.tempAvatarUrl = '';
+    const name = modal.querySelector('#prof-name')?.value || 'Student';
+    previewBox.innerHTML = `<span id="avatar-preview-text">${getInitials(name)}</span>`;
+  });
+
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      presetBtns.forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      const color = btn.dataset.color;
+      previewBox.style.background = color;
+      modal.dataset.tempAvatarColor = color;
+    });
+  });
+
+  // Form submit handler
+  const form = modal.querySelector('#profile-edit-form');
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = modal.querySelector('#profile-save-btn');
+    const spinner = modal.querySelector('#profile-spinner');
+    const btnText = modal.querySelector('#profile-save-text');
+
+    const name = modal.querySelector('#prof-name').value.trim();
+    const matric = modal.querySelector('#prof-matric').value.trim();
+
+    if (!name) {
+      showToast('Please enter your full name.');
+      modal.querySelector('#prof-name').focus();
+      return;
+    }
+    if (!matric) {
+      showToast('Please enter your matric number.');
+      modal.querySelector('#prof-matric').focus();
+      return;
+    }
+
+    saveBtn.classList.add('btn-loading');
+    if (spinner) spinner.hidden = false;
+    if (btnText) btnText.textContent = 'Saving...';
+
+    await new Promise(r => setTimeout(r, 350));
+
+    const currentUser = getStoredUser() || {};
+    const updated = {
+      ...currentUser,
+      name,
+      matric,
+      phone: modal.querySelector('#prof-phone').value.trim(),
+      faculty: modal.querySelector('#prof-faculty').value,
+      department: modal.querySelector('#prof-department').value.trim(),
+      level: modal.querySelector('#prof-level').value,
+      hostel: modal.querySelector('#prof-hostel').value,
+      bio: modal.querySelector('#prof-bio').value.trim()
+    };
+
+    if (modal.dataset.tempAvatarUrl !== undefined) {
+      updated.avatarUrl = modal.dataset.tempAvatarUrl || null;
+    }
+    if (modal.dataset.tempAvatarColor) {
+      updated.avatarColor = modal.dataset.tempAvatarColor;
+    }
+
+    localStorage.setItem('campulse_user', JSON.stringify(updated));
+
+    if (window.CamPulseDB && window.CamPulseDB.updateUserProfile) {
+      window.CamPulseDB.updateUserProfile(updated);
+    }
+
+    saveBtn.classList.remove('btn-loading');
+    if (spinner) spinner.hidden = true;
+    if (btnText) btnText.textContent = 'Save Profile Changes';
+
+    showToast('Student profile updated successfully!');
+    closeProfileModal();
+    initUserAuthDisplay();
+    renderDashboardProfile();
+
+    window.dispatchEvent(new CustomEvent('campulse:user-updated', { detail: updated }));
+  });
+
+  return modal;
+}
+
+function openProfileModal() {
+  const modal = ensureProfileModal();
+  const user = getStoredUser();
+  if (!user) {
+    showToast('Please sign in to view and edit your profile.');
+    const authBtn = document.getElementById('auth-open-btn');
+    if (authBtn) authBtn.click();
+    return;
+  }
+
+  // Populate fields
+  modal.querySelector('#prof-name').value = user.name || '';
+  modal.querySelector('#prof-matric').value = user.matric || '';
+  modal.querySelector('#prof-email').value = user.email || '';
+  modal.querySelector('#prof-phone').value = user.phone || '';
+  if (user.faculty) modal.querySelector('#prof-faculty').value = user.faculty;
+  modal.querySelector('#prof-department').value = user.department || '';
+  if (user.level) modal.querySelector('#prof-level').value = user.level;
+  if (user.hostel) modal.querySelector('#prof-hostel').value = user.hostel;
+  modal.querySelector('#prof-bio').value = user.bio || '';
+
+  const previewBox = modal.querySelector('#avatar-preview-box');
+  const bgColor = user.avatarColor || '#059669';
+  previewBox.style.background = bgColor;
+  modal.dataset.tempAvatarColor = bgColor;
+  modal.dataset.tempAvatarUrl = user.avatarUrl || '';
+
+  if (user.avatarUrl) {
+    previewBox.innerHTML = `<img src="${user.avatarUrl}" alt="${escapeHtml(user.name)}" />`;
+  } else {
+    previewBox.innerHTML = `<span id="avatar-preview-text">${getInitials(user.name)}</span>`;
+  }
+
+  // Highlight matching color preset
+  const presetBtns = modal.querySelectorAll('.avatar-preset-btn');
+  presetBtns.forEach(b => {
+    b.classList.toggle('selected', b.dataset.color === bgColor);
+  });
+
+  modal.classList.add('open');
+  document.documentElement.classList.add('modal-open');
+  document.body.classList.add('modal-open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeProfileModal() {
+  const modal = document.getElementById('profile-modal');
+  if (modal) {
+    modal.classList.remove('open');
+  }
+  document.documentElement.classList.remove('modal-open');
+  document.body.classList.remove('modal-open');
+  document.body.style.overflow = '';
+}
+
+function handleUserLogout() {
+  const user = getStoredUser();
+  const name = user ? user.name : 'your account';
+  if (confirm(`Are you sure you want to sign out from ${name}?`)) {
+    localStorage.removeItem('campulse_user');
+    showToast('Signed out successfully.');
+    initUserAuthDisplay();
+    renderDashboardProfile();
+    setTimeout(() => {
+      window.location.reload();
+    }, 400);
+  }
+}
+
+/** Render or update the Top-Nav authentication state and dropdown */
+function initUserAuthDisplay() {
+  const user = getStoredUser();
+  const container = document.querySelector('.header-actions');
+  if (!container) return;
+
+  // Check if dropdown or auth button already exists
+  let existingAuthBtn = document.getElementById('auth-open-btn');
+  let existingMenu = document.getElementById('user-menu-wrapper');
+
+  if (user && user.name) {
+    // User is logged in: show professional user trigger & dropdown
+    if (existingAuthBtn) existingAuthBtn.remove();
+    if (!existingMenu) {
+      existingMenu = document.createElement('div');
+      existingMenu.id = 'user-menu-wrapper';
+      existingMenu.className = 'user-menu-wrapper';
+      container.appendChild(existingMenu);
+    }
+
+    const firstName = user.name.split(' ')[0] || 'Student';
+    const initials = getInitials(user.name);
+    const avatarBg = user.avatarColor || '#059669';
+
+    existingMenu.innerHTML = `
+      <button type="button" class="user-profile-trigger" id="user-profile-trigger" aria-expanded="false" aria-haspopup="true">
+        <div class="user-avatar-circle" style="background:${avatarBg};">
+          ${user.avatarUrl ? `<img src="${user.avatarUrl}" alt="${escapeHtml(user.name)}" />` : `<span>${initials}</span>`}
+        </div>
+        <span class="user-trigger-name">${escapeHtml(firstName)}</span>
+        <svg class="user-trigger-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      <div class="user-dropdown-menu" id="user-dropdown-menu" hidden>
+        <div class="user-dropdown-header">
+          <div class="user-dropdown-user-info">
+            <div class="user-dropdown-avatar" style="background:${avatarBg};">
+              ${user.avatarUrl ? `<img src="${user.avatarUrl}" alt="${escapeHtml(user.name)}" />` : `<span>${initials}</span>`}
+            </div>
+            <div>
+              <div class="user-dropdown-name">${escapeHtml(user.name)}</div>
+              <div class="user-dropdown-matric">${escapeHtml(user.matric || user.email)}</div>
+              <span class="user-dropdown-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Verified Student
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="user-dropdown-item" id="menu-open-profile-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          Profile &amp; Settings
+        </button>
+
+        <a href="dashboard.html" class="user-dropdown-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
+          </svg>
+          Complaints Dashboard
+        </a>
+
+        <a href="issues.html" class="user-dropdown-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          Community Board
+        </a>
+
+        <div class="user-dropdown-divider"></div>
+
+        <button type="button" class="user-dropdown-item danger" id="menu-user-logout-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    `;
+
+    const trigger = existingMenu.querySelector('#user-profile-trigger');
+    const dropdown = existingMenu.querySelector('#user-dropdown-menu');
+    const profileItemBtn = existingMenu.querySelector('#menu-open-profile-btn');
+    const logoutItemBtn = existingMenu.querySelector('#menu-user-logout-btn');
+
+    trigger?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = dropdown.hidden;
+      dropdown.hidden = !isHidden;
+      trigger.setAttribute('aria-expanded', String(isHidden));
+    });
+
+    profileItemBtn?.addEventListener('click', () => {
+      dropdown.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      openProfileModal();
+    });
+
+    logoutItemBtn?.addEventListener('click', () => {
+      dropdown.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      handleUserLogout();
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!existingMenu.contains(e.target)) {
+        dropdown.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+  } else {
+    // User is logged out: restore default Auth button
+    if (existingMenu) existingMenu.remove();
+    if (!existingAuthBtn) {
+      existingAuthBtn = document.createElement('button');
+      existingAuthBtn.className = 'nav-auth-btn';
+      existingAuthBtn.id = 'auth-open-btn';
+      existingAuthBtn.setAttribute('aria-label', 'Register or Sign In');
+      existingAuthBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span>Register / Sign In</span>
+      `;
+      container.appendChild(existingAuthBtn);
+
+      existingAuthBtn.addEventListener('click', () => {
+        const overlay = document.getElementById('auth-modal');
+        if (overlay) {
+          overlay.classList.add('open');
+          document.documentElement.classList.add('modal-open');
+          document.body.classList.add('modal-open');
+          document.body.style.overflow = 'hidden';
+        }
+      });
+    }
+  }
+}
+
+/** Render Student Profile Overview on the Dashboard Page */
+function renderDashboardProfile() {
+  const profileSection = document.getElementById('dashboard-profile-section');
+  if (!profileSection) return;
+
+  const user = getStoredUser();
+
+  if (user && user.name) {
+    const initials = getInitials(user.name);
+    const avatarBg = user.avatarColor || '#059669';
+
+    profileSection.innerHTML = `
+      <div class="profile-overview-card reveal in" data-anim="up">
+        <div class="profile-overview-inner">
+          <div class="profile-left-cluster">
+            <div class="profile-hero-avatar" style="background:${avatarBg};">
+              ${user.avatarUrl ? `<img src="${user.avatarUrl}" alt="${escapeHtml(user.name)}" />` : `<span>${initials}</span>`}
+            </div>
+            <div class="profile-meta-main">
+              <h2>
+                ${escapeHtml(user.name)}
+                <span class="profile-verified-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  Verified Student
+                </span>
+              </h2>
+              <div class="profile-details-line">
+                <span style="font-weight:700;font-family:monospace;color:var(--clr-primary-700);">${escapeHtml(user.matric || 'Student ID')}</span>
+                <span>&bull;</span>
+                <span>${escapeHtml(user.faculty || 'Faculty of Technology')}</span>
+                ${user.department ? `<span>&bull;</span><span>${escapeHtml(user.department)}</span>` : ''}
+                ${user.level ? `<span>&bull;</span><span>${escapeHtml(user.level)}</span>` : ''}
+                ${user.hostel ? `<span>&bull;</span><span>${escapeHtml(user.hostel)}</span>` : ''}
+              </div>
+              ${user.bio ? `<div class="profile-bio-snippet">&ldquo;${escapeHtml(user.bio)}&rdquo;</div>` : ''}
+            </div>
+          </div>
+          <div class="profile-actions-cluster">
+            <button type="button" class="btn btn-secondary btn-sm" id="dash-edit-profile-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit Profile
+            </button>
+            <button type="button" class="btn btn-sm btn-text-action" id="dash-logout-btn" style="color:#dc2626;">
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    profileSection.querySelector('#dash-edit-profile-btn')?.addEventListener('click', openProfileModal);
+    profileSection.querySelector('#dash-logout-btn')?.addEventListener('click', handleUserLogout);
+  } else {
+    profileSection.innerHTML = `
+      <div class="profile-overview-card reveal in" data-anim="up" style="background:var(--clr-gray-50);border-color:var(--clr-gray-200);">
+        <div class="profile-overview-inner">
+          <div class="profile-left-cluster">
+            <div class="profile-hero-avatar" style="background:var(--clr-gray-200);color:var(--clr-gray-600);border-color:var(--clr-gray-300);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="30" height="30"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div class="profile-meta-main">
+              <h2 style="font-size:var(--fs-base);color:var(--clr-gray-800);">Welcome to Your Campus Voice Portal</h2>
+              <p style="font-size:var(--fs-xs);color:var(--clr-gray-600);margin:4px 0 0 0;max-width:540px;">
+                Sign in with your verified university credentials to customize your student profile, upload your profile picture, and link all your submitted feedback in real-time.
+              </p>
+            </div>
+          </div>
+          <div class="profile-actions-cluster">
+            <button type="button" class="btn btn-primary btn-sm" id="dash-guest-auth-btn">
+              Register / Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    profileSection.querySelector('#dash-guest-auth-btn')?.addEventListener('click', () => {
+      const authBtn = document.getElementById('auth-open-btn');
+      if (authBtn) {
+        authBtn.click();
+      } else {
+        const overlay = document.getElementById('auth-modal');
+        if (overlay) {
+          overlay.classList.add('open');
+          document.documentElement.classList.add('modal-open');
+          document.body.classList.add('modal-open');
+        }
+      }
+    });
   }
 }
 

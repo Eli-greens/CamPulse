@@ -186,14 +186,10 @@
         <h3 class="verify-title" id="verify-modal-title">Verify University Email</h3>
         <p class="verify-subtext">We've sent a 6-digit verification code to <strong id="verify-target-email">your email</strong>. Enter the code below to complete student registration.</p>
 
-        <div class="verify-demo-note" role="note">
-          Demo verification code: <strong id="demo-code-display">482910</strong>
-        </div>
-
         <form class="modal-form" id="verify-form" novalidate>
           <div class="form-group">
             <label for="verify-code">6-Digit Verification Code</label>
-            <input class="input verify-code-input" type="text" id="verify-code" maxlength="6" inputmode="numeric" placeholder="482910" required aria-describedby="verify-code-error" />
+            <input class="input verify-code-input" type="text" id="verify-code" maxlength="6" inputmode="numeric" placeholder="Enter 6-digit code" required aria-describedby="verify-code-error" />
             <div class="form-error-msg" id="verify-code-error" role="alert" aria-live="polite"></div>
           </div>
           <button type="submit" class="btn btn-primary btn-block" id="verify-submit-btn">
@@ -273,6 +269,9 @@
     </section>
 
     <div class="container dashboard-layout">
+
+      <!-- Student Profile Overview Banner (Populated dynamically) -->
+      <div id="dashboard-profile-section"></div>
 
       <!-- Stats -->
       <section class="stats-row" aria-label="Ticket statistics">
@@ -384,9 +383,18 @@
                 <h3>Water supply disruption at Fajuyi Hall Block 2</h3>
                 <p>Tap water supply has been unavailable on the 2nd and 3rd floors since yesterday morning. Students are currently carrying buckets from the ground floor.</p>
                 <div class="ticket-card-chips">
-                  <span class="card-chip">📍 Fajuyi Hall (Block 2)</span>
-                  <span class="card-chip">📎 2 Photos Attached</span>
-                  <span class="card-chip">💬 3 Staff Comments</span>
+                  <span class="card-chip">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Fajuyi Hall (Block 2)
+                  </span>
+                  <span class="card-chip">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    2 Photos Attached
+                  </span>
+                  <span class="card-chip">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    3 Staff Comments
+                  </span>
                 </div>
               </div>
               <div class="ticket-footer">
@@ -434,7 +442,7 @@
             The university student complaint &amp; feedback accountability platform. Giving every student voice transparency, speed, and real change.
           </p>
           <div class="footer-institution">
-            <span>🏛️ Obafemi Awolowo University, Ile-Ife</span>
+            <span>Obafemi Awolowo University, Ile-Ife</span>
           </div>
         </div>
 

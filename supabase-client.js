@@ -714,6 +714,113 @@ const CamPulseDB = (function () {
     localStorage.setItem(UPVOTES_KEY, JSON.stringify(upvotes));
   }
 
+  // ── Helper: Normalize single ticket from cloud or local format ──────
+  function normalizeSingleTicket(t) {
+    if (!t) return null;
+    const createdAt = t.createdAt || t.created_at || new Date().toISOString();
+    const resolvedAt = t.resolvedAt || t.resolved_at || null;
+    const category = t.category || 'Other';
+    const department = t.department || DEPARTMENT_MAPPING[category] || 'Student Affairs';
+
+    // Normalize attachments
+    const rawAttachments = Array.isArray(t.attachments)
+      ? t.attachments
+      : (Array.isArray(t.ticket_attachments) ? t.ticket_attachments : []);
+    const attachments = rawAttachments.map(a => ({
+      id: a.id || 'att-' + Math.random().toString(36).substring(2, 8),
+      name: a.name || a.file_name || 'attachment',
+      size: typeof a.size === 'number' ? a.size : (typeof a.file_size === 'number' ? a.file_size : 0),
+      type: a.type || a.file_type || 'application/octet-stream',
+      url: a.url || a.file_url || '#'
+    }));
+
+    // Normalize comments
+    const rawComments = Array.isArray(t.comments)
+      ? t.comments
+      : (Array.isArray(t.ticket_comments) ? t.ticket_comments : []);
+    const comments = rawComments.map(c => ({
+      id: c.id || 'cm-' + Math.random().toString(36).substring(2, 8),
+      ticketId: t.id,
+      authorName: c.authorName || c.author_name || (c.authorRole === 'staff' || c.author_role === 'staff' ? 'Department Desk Officer' : 'Student'),
+      authorRole: c.authorRole || c.author_role || 'student',
+      isInternal: Boolean(c.isInternal || c.is_internal),
+      message: c.message || '',
+      createdAt: c.createdAt || c.created_at || createdAt
+    }));
+
+    // Reconstruct timeline if absent
+    let timeline = Array.isArray(t.timeline) && t.timeline.length > 0 ? t.timeline : null;
+    if (!timeline) {
+      timeline = [
+        {
+          step: 'submitted',
+          title: 'Complaint Submitted',
+          timestamp: createdAt,
+          actor: (t.isAnonymous || t.is_anonymous) ? 'Anonymous Student' : (t.studentName || 'Student'),
+          note: (t.isAnonymous || t.is_anonymous)
+            ? 'Ticket submitted anonymously. Protected student identity.'
+            : 'Ticket logged and authenticated.'
+        }
+      ];
+      if (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'resolved' || t.status === 'closed') {
+        timeline.push({
+          step: 'assigned',
+          title: `Auto-Assigned to ${department}`,
+          timestamp: new Date(new Date(createdAt).getTime() + 1000 * 3600).toISOString(),
+          actor: 'System Auto-Router',
+          note: `Categorized under "${category}". Standard SLA target active.`
+        });
+      }
+      if (t.status === 'in_progress' || t.status === 'resolved' || t.status === 'closed') {
+        timeline.push({
+          step: 'in_progress',
+          title: 'Maintenance Crew Dispatched',
+          timestamp: new Date(new Date(createdAt).getTime() + 1000 * 7200).toISOString(),
+          actor: 'Department Officer',
+          note: 'Investigation and active repair in progress.'
+        });
+      }
+      if (t.status === 'resolved' || t.status === 'closed') {
+        timeline.push({
+          step: 'resolved',
+          title: 'Issue Resolved & Restored',
+          timestamp: resolvedAt || new Date(new Date(createdAt).getTime() + 1000 * 14400).toISOString(),
+          actor: 'Department Desk Officer',
+          note: 'Resolution completed and verified.'
+        });
+      }
+    }
+
+    return {
+      ...t,
+      id: t.id,
+      category,
+      department,
+      subject: t.subject || 'Complaint',
+      description: t.description || '',
+      urgent: Boolean(t.urgent),
+      status: t.status === 'reviewed' ? 'in_progress' : (t.status || 'pending'),
+      isAnonymous: Boolean(t.isAnonymous !== undefined ? t.isAnonymous : t.is_anonymous),
+      isPublic: Boolean(t.isPublic !== undefined ? t.isPublic : t.is_public),
+      studentName: t.studentName || t.student_name || ((t.isAnonymous || t.is_anonymous) ? 'Anonymous Student' : 'Student'),
+      studentMatric: t.studentMatric || t.student_matric || null,
+      studentEmail: t.studentEmail || t.student_email || null,
+      locationZone: t.locationZone || t.location_zone || 'Campus Facility',
+      locationDetails: t.locationDetails || t.location_details || '',
+      attachments,
+      comments,
+      timeline,
+      upvotesCount: typeof t.upvotesCount === 'number' ? t.upvotesCount : (typeof t.upvotes_count === 'number' ? t.upvotes_count : 0),
+      rating: t.rating || null,
+      ratingComment: t.ratingComment || t.rating_comment || '',
+      ratedAt: t.ratedAt || t.rated_at || null,
+      reopenCount: t.reopenCount || t.reopen_count || 0,
+      reopenedAt: t.reopenedAt || t.reopened_at || null,
+      createdAt,
+      resolvedAt
+    };
+  }
+
   // ── Public API Methods ──────────────────────────────────────────────
   return {
     isCloud: () => isCloudEnabled,
@@ -736,9 +843,54 @@ const CamPulseDB = (function () {
 
     clearCurrentUser: () => {
       localStorage.removeItem(USER_KEY);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campulse:user-updated', { detail: null }));
+      }
     },
 
-    /** Fetch all tickets */
+    /** Update current student profile */
+    async updateUserProfile(profileData) {
+      try {
+        const current = this.getCurrentUser() || {};
+        const updated = {
+          ...current,
+          ...profileData,
+          updatedAt: new Date().toISOString()
+        };
+        this.setCurrentUser(updated);
+
+        if (isCloudEnabled && client && updated.id) {
+          try {
+            await client.from('profiles').upsert({
+              id: updated.id,
+              full_name: updated.name,
+              matric_no: updated.matric,
+              department: updated.department,
+              phone: updated.phone,
+              avatar_url: updated.avatarUrl || null,
+              bio: updated.bio || null,
+              faculty: updated.faculty || null,
+              level: updated.level || null,
+              hostel: updated.hostel || null,
+              updated_at: new Date().toISOString()
+            });
+          } catch (cloudErr) {
+            console.warn('[CamPulse] Cloud profile update sync:', cloudErr);
+          }
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('campulse:user-updated', { detail: updated }));
+        }
+
+        return updated;
+      } catch (err) {
+        console.error('[CamPulse] Failed to update user profile:', err);
+        throw err;
+      }
+    },
+
+    /** Fetch all tickets with consistent normalization */
     async fetchAllTickets() {
       if (isCloudEnabled && client) {
         try {
@@ -746,12 +898,14 @@ const CamPulseDB = (function () {
             .from('tickets')
             .select('*, ticket_attachments(*), ticket_comments(*)')
             .order('created_at', { ascending: false });
-          if (!error && data && data.length > 0) return data;
+          if (!error && data && data.length > 0) {
+            return data.map(normalizeSingleTicket);
+          }
         } catch (e) {
           console.warn('[CamPulse] Supabase fetch error, falling back to local:', e);
         }
       }
-      return getLocalTickets();
+      return getLocalTickets().map(normalizeSingleTicket);
     },
 
     /** Fetch public issues (Phase 3 Item 14) */
@@ -969,7 +1123,7 @@ const CamPulseDB = (function () {
     /** Fetch a single ticket by ID */
     async fetchTicketById(ticketId) {
       if (!ticketId) return null;
-      const cleanId = ticketId.trim();
+      const cleanId = String(ticketId).trim();
 
       if (isCloudEnabled && client) {
         try {
@@ -978,14 +1132,20 @@ const CamPulseDB = (function () {
             .select('*, ticket_attachments(*), ticket_comments(*)')
             .eq('id', cleanId)
             .single();
-          if (!error && data) return data;
+          if (!error && data) return normalizeSingleTicket(data);
         } catch (e) {
           console.warn('[CamPulse] Supabase single fetch error:', e);
         }
       }
 
       const tickets = getLocalTickets();
-      return tickets.find(t => t.id.toLowerCase() === cleanId.toLowerCase()) || null;
+      const found = tickets.find(t => t.id && t.id.toLowerCase() === cleanId.toLowerCase());
+      if (found) return normalizeSingleTicket(found);
+
+      // Fallback to seed tickets if needed
+      const seeds = getSeedTickets();
+      const seedFound = seeds.find(s => s.id && s.id.toLowerCase() === cleanId.toLowerCase());
+      return seedFound ? normalizeSingleTicket(seedFound) : null;
     },
 
     /** Create a new ticket with attachments and auto-routing */

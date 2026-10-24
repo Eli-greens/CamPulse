@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CamPulse — Department Admin &amp; Staff Console</title>
+  <meta name="description" content="University department ticket queue, role-based assignment, SLA tracking, internal staff notes, and resolution analytics." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .admin-page-wrap { padding-bottom: 4rem; }
+    .queue-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .filter-controls-group { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .table-check-col { width: 36px; text-align: center; }
+    .sla-timer-text { font-family: monospace; font-size: 0.72rem; font-weight: 700; }
+    .drawer-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 1100; display: flex; justify-content: flex-end; }
+    .drawer-panel { width: 620px; max-width: 100vw; height: 100%; background: var(--clr-white); box-shadow: -8px 0 32px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow-y: auto; padding: 1.75rem; }
+    .drawer-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--clr-gray-200); }
+    .drawer-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--clr-gray-200); }
+    .drawer-tab { background: none; border: none; padding: 0.5rem 1rem; font-weight: 600; font-size: 0.85rem; color: var(--clr-gray-600); cursor: pointer; border-bottom: 2px solid transparent; }
+    .drawer-tab.active { color: var(--clr-primary-700); border-bottom-color: var(--clr-primary-700); }
+  </style>
+</head>
+<body>
+  <!-- Ambient background blobs -->
+  <div class="bg-blobs" aria-hidden="true"></div>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <div class="header-left">
+        <a href="index.html" class="brand" aria-label="CamPulse Home">
+          <img src="favicon.png" alt="CamPulse Logo" class="brand-icon" width="36" height="36" />
+          <div class="brand-text">Cam<span>Pulse</span></div>
+        </a>
+        <span class="section-badge" style="background:#1e293b;color:#f8fafc;border-color:#334155;margin-left:0.5rem;">
+          Staff &amp; Admin Console
+        </span>
+      </div>
+
+      <nav aria-label="Admin navigation">
+        <ul class="nav-links">
+          <li><a href="index.html">Student Portal</a></li>
+          <li><a href="issues.html">Community Board</a></li>
+          <li><a href="dashboard.html">My Dashboard</a></li>
+          <li><a href="admin.html" class="active">Admin Queue</a></li>
+        </ul>
+      </nav>
+
+      <div class="header-actions">
+        <!-- Notification Bell -->
+        <div class="notif-wrapper" id="notif-wrapper">
+          <button type="button" class="icon-btn notif-bell-btn" id="notif-bell-btn" aria-label="Notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span class="notif-badge" id="notif-badge" hidden>0</span>
+          </button>
+          <div class="notif-dropdown" id="notif-dropdown" hidden role="region">
+            <div class="notif-dropdown-header">
+              <div class="notif-dropdown-title">
+                <span>Notifications</span>
+                <span class="notif-unread-count-pill" id="notif-unread-count-pill">0 new</span>
+              </div>
+              <div class="notif-header-actions">
+                <button type="button" class="btn-text-action" id="notif-mark-all-btn">Mark read</button>
+                <button type="button" class="btn-text-action" id="notif-settings-open-btn" aria-label="Preferences">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="notif-list" id="notif-list"></div>
+          </div>
+        </div>
+
+        <!-- Dark Mode Toggle -->
+        <button type="button" class="icon-btn theme-toggle-btn" id="theme-toggle-btn" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" style="display:none;">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== ROLE SELECTOR & AUDIT BANNER ===== -->
+  <section class="admin-header-strip">
+    <div class="container">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+        <div>
+          <h1 style="font-size:1.75rem;margin-bottom:0.25rem;">University Complaint Management Queue</h1>
+          <p style="font-size:0.875rem;color:#94a3b8;margin:0;">
+            Role-based resolution console for university administrators, department heads, and field technicians.
+          </p>
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-export-csv" title="Export all complaints to CSV">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export to CSV
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-reset-demo" title="Restore presentation sample data" style="color:#ef4444;">
+            Reset Demo Data
+          </button>
+        </div>
+      </div>
+
+      <!-- Role-Based Switcher (Phase 5 Item 22) -->
+      <div class="admin-role-selector-bar">
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+          <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;">
+            Active Security Role:
+          </span>
+          <div class="role-badge-group" role="radiogroup" aria-label="Select administrator security role">
+            <button type="button" class="role-btn active" data-role="super_admin" data-dept="">
+              👑 Super Admin (Full University Access)
+            </button>
+            <button type="button" class="role-btn" data-role="dept_admin" data-dept="Division of Works &amp; Maintenance Services">
+              🔧 Works &amp; Maintenance Admin
+            </button>
+            <button type="button" class="role-btn" data-role="dept_admin" data-dept="Division of Student Affairs (Accommodations)">
+              🏠 Student Affairs (Hostels)
+            </button>
+            <button type="button" class="role-btn" data-role="staff" data-dept="Division of Works &amp; Maintenance Services" data-staff="Engr. O. Kolawole">
+              👷 Staff Officer (Engr. Kolawole)
+            </button>
+          </div>
+        </div>
+
+        <div id="role-audit-note" style="font-size:0.75rem;color:#60a5fa;">
+          Viewing all departments with full safety audit &amp; identity privileges.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== MAIN CONSOLE ===== -->
+  <main class="container admin-page-wrap">
+
+    <!-- Analytics Metric Cards (Phase 5 Item 27) -->
+    <section class="analytics-grid" aria-label="Resolution metrics summary">
+      <div class="analytics-card">
+        <span class="stat-label">Total Assigned Complaints</span>
+        <div class="stat-number" id="adm-stat-total">0</div>
+        <p style="font-size:0.72rem;color:var(--clr-gray-500);margin:0;">Institutional queue volume</p>
+      </div>
+
+      <div class="analytics-card">
+        <span class="stat-label">Resolution Rate</span>
+        <div class="stat-number" style="color:#16a34a;"><span id="adm-stat-rate">0</span>%</div>
+        <p style="font-size:0.72rem;color:var(--clr-gray-500);margin:0;"><span id="adm-stat-resolved">0</span> complaints fixed</p>
+      </div>
+
+      <div class="analytics-card">
+        <span class="stat-label">Avg. First Response</span>
+        <div class="stat-number"><span id="adm-stat-response">0</span>h</div>
+        <p style="font-size:0.72rem;color:var(--clr-gray-500);margin:0;">Target window: &lt; 24h</p>
+      </div>
+
+      <div class="analytics-card">
+        <span class="stat-label">Student Satisfaction</span>
+        <div class="stat-number" style="color:#eab308;">⭐ <span id="adm-stat-satisfaction">0.0</span></div>
+        <p style="font-size:0.72rem;color:var(--clr-gray-500);margin:0;">Based on resolved reviews</p>
+      </div>
+
+      <div class="analytics-card" style="border-left:4px solid #ef4444;">
+        <span class="stat-label">SLA Overdue Alerts</span>
+        <div class="stat-number" style="color:#dc2626;" id="adm-stat-overdue">0</div>
+        <p style="font-size:0.72rem;color:var(--clr-gray-500);margin:0;">Tickets exceeding 24h/72h SLA</p>
+      </div>
+    </section>
+
+    <!-- Queue Filters & Bulk Actions Toolbar (Phase 5 Item 24) -->
+    <section class="glass-card" style="padding:1.25rem;margin-bottom:1.5rem;" aria-label="Ticket queue controls">
+      <div class="queue-toolbar">
+        <!-- Search -->
+        <div style="flex:1;min-width:260px;position:relative;">
+          <input type="search" class="input" id="adm-search-input" placeholder="Search by ID, keyword, student, location…" style="padding-left:2.5rem;" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);color:var(--clr-gray-400);">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+
+        <!-- Filter Selects -->
+        <div class="filter-controls-group">
+          <select class="select select-sm" id="adm-filter-status" aria-label="Filter status">
+            <option value="all">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="assigned">Assigned</option>
+            <option value="in_progress">In Progress</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+          </select>
+
+          <select class="select select-sm" id="adm-filter-category" aria-label="Filter category">
+            <option value="all">All Categories</option>
+            <option value="Academic">Academic</option>
+            <option value="Facilities">Facilities</option>
+            <option value="Hostel">Hostel</option>
+            <option value="Finance">Finance</option>
+            <option value="IT">IT &amp; Tech</option>
+            <option value="Safety">Safety &amp; Security</option>
+            <option value="Food">Food Services</option>
+            <option value="Administration">Administration</option>
+          </select>
+
+          <select class="select select-sm" id="adm-filter-sla" aria-label="Filter SLA urgency">
+            <option value="all">All Priorities</option>
+            <option value="urgent">⚡ Urgent Priority Only</option>
+            <option value="overdue">🚨 Overdue SLA Violations</option>
+          </select>
+
+          <select class="select select-sm" id="adm-sort-by" aria-label="Sort tickets">
+            <option value="newest">🕒 Newest First</option>
+            <option value="oldest">⏳ Oldest First</option>
+            <option value="upvotes">🔥 Most Upvoted</option>
+            <option value="sla">⚠️ SLA Urgency</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Bulk Selection Toolbar (Appears when rows selected) -->
+      <div class="bulk-actions-strip" id="bulk-actions-strip" hidden>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--clr-primary-900);">
+          <span id="bulk-selected-count">0</span> complaints selected
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <select class="select select-sm" id="bulk-status-select" style="width:auto;">
+            <option value="">Update Status To…</option>
+            <option value="assigned">Mark Assigned</option>
+            <option value="in_progress">Mark In Progress</option>
+            <option value="resolved">Mark Resolved</option>
+            <option value="closed">Mark Closed</option>
+          </select>
+          <button type="button" class="btn btn-primary btn-sm" id="bulk-apply-btn">
+            Apply Bulk Action
+          </button>
+        </div>
+      </div>
+
+      <!-- Table View -->
+      <div class="admin-table-container">
+        <table class="admin-table" id="admin-tickets-table">
+          <thead>
+            <tr>
+              <th class="table-check-col">
+                <input type="checkbox" id="check-select-all" aria-label="Select all complaints" />
+              </th>
+              <th>Ticket ID</th>
+              <th>Subject &amp; Location</th>
+              <th>Category / Department</th>
+              <th>Student Identity</th>
+              <th>SLA Status</th>
+              <th>Current Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="admin-tickets-tbody">
+            <!-- Rendered via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="adm-empty-state" hidden style="padding:3rem 1rem;">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <h3>No complaints match the filter criteria</h3>
+        <p>Try clearing filters or switching department roles above.</p>
+      </div>
+    </section>
+
+    <!-- Institutional Analytics Breakdown Charts (Phase 5 Item 27) -->
+    <section class="analytics-card" style="padding:1.5rem;margin-bottom:2rem;" aria-label="Institutional distribution charts">
+      <h3 style="font-size:1.1rem;margin-bottom:1rem;color:var(--clr-gray-900);">Campus Department &amp; Issue Distributions</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:2rem;">
+        <div>
+          <h4 style="font-size:0.85rem;color:var(--clr-gray-600);margin-bottom:0.75rem;">Volume by Category</h4>
+          <div class="bar-distribution-list" id="chart-by-category"></div>
+        </div>
+        <div>
+          <h4 style="font-size:0.85rem;color:var(--clr-gray-600);margin-bottom:0.75rem;">Volume by Department</h4>
+          <div class="bar-distribution-list" id="chart-by-department"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== TICKET DETAIL & INTERNAL STAFF DRAWER (Phase 5 Item 26) ===== -->
+  <div class="drawer-overlay" id="ticket-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="drawer-ticket-title">
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div>
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.25rem;">
+            <span class="ticket-id" id="drawer-ticket-id">CP-2026-XXXX</span>
+            <span class="ticket-category" id="drawer-ticket-category">Category</span>
+            <span class="sla-badge" id="drawer-sla-badge">SLA</span>
+          </div>
+          <h2 id="drawer-ticket-title" style="font-size:1.15rem;margin:0;line-height:1.3;">Complaint Title</h2>
+        </div>
+        <button type="button" class="modal-close" id="drawer-close-btn" aria-label="Close panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Quick Action Toolbar in Drawer -->
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem;padding:0.75rem;background:var(--clr-gray-50);border-radius:var(--radius-md);">
+        <label for="drawer-status-select" style="font-size:0.75rem;font-weight:700;">Status:</label>
+        <select class="select select-sm" id="drawer-status-select" style="width:auto;">
+          <option value="pending">Pending</option>
+          <option value="assigned">Assigned</option>
+          <option value="in_progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="closed">Closed</option>
+        </select>
+        <button type="button" class="btn btn-primary btn-sm" id="drawer-update-status-btn">Update Status</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="drawer-mod-btn" style="margin-left:auto;color:#dc2626;">
+          Flag / Hide Abusive
+        </button>
+      </div>
+
+      <!-- Drawer Content Tabs -->
+      <div class="drawer-tabs" role="tablist">
+        <button type="button" class="drawer-tab active" data-tab="tab-details">Overview &amp; Evidence</button>
+        <button type="button" class="drawer-tab" data-tab="tab-comments">Public Student Thread</button>
+        <button type="button" class="drawer-tab" data-tab="tab-internal-notes" style="color:#b45309;">
+          🔒 Internal Notes (<span id="internal-notes-count">0</span>)
+        </button>
+      </div>
+
+      <!-- Tab 1: Details -->
+      <div id="drawer-pane-details">
+        <div style="margin-bottom:1rem;">
+          <h4 style="font-size:0.75rem;text-transform:uppercase;color:var(--clr-gray-500);margin-bottom:0.25rem;">Student Description</h4>
+          <p id="drawer-description" style="font-size:0.875rem;line-height:1.5;color:var(--clr-gray-800);background:var(--clr-gray-50);padding:0.75rem;border-radius:var(--radius-sm);"></p>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <h4 style="font-size:0.75rem;text-transform:uppercase;color:var(--clr-gray-500);margin-bottom:0.25rem;">Location &amp; Student Identity</h4>
+          <div style="font-size:0.825rem;color:var(--clr-gray-700);line-height:1.6;" id="drawer-meta-info"></div>
+        </div>
+
+        <div>
+          <h4 style="font-size:0.75rem;text-transform:uppercase;color:var(--clr-gray-500);margin-bottom:0.25rem;">Attached Evidence</h4>
+          <div id="drawer-attachments-list" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Public Student Thread -->
+      <div id="drawer-pane-comments" hidden>
+        <div class="comments-thread" id="drawer-comments-list" style="max-height:280px;overflow-y:auto;margin-bottom:1rem;"></div>
+        <form id="drawer-comment-form">
+          <div class="form-group">
+            <label for="drawer-comment-input">Post Official Response to Student</label>
+            <textarea class="textarea" id="drawer-comment-input" rows="3" placeholder="Provide clear status updates, dispatch notes, or resolution confirmation…" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Post Official Response</button>
+        </form>
+      </div>
+
+      <!-- Tab 3: Internal Notes (Phase 5 Item 26) -->
+      <div id="drawer-pane-internal-notes" hidden>
+        <div class="internal-notes-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="internal-note-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Staff Only — Strictly Confidential
+            </span>
+            <span style="font-size:0.7rem;color:var(--clr-gray-500);">Students cannot see these notes</span>
+          </div>
+
+          <div class="internal-notes-list" id="drawer-internal-notes-list">
+            <!-- Rendered via JS -->
+          </div>
+
+          <form id="drawer-internal-note-form" style="margin-top:1rem;">
+            <div class="form-group" style="margin-bottom:0.5rem;">
+              <textarea class="textarea" id="drawer-internal-note-input" rows="2" placeholder="Record internal technician remarks, requisition numbers, or supervisor comments…" required style="background:#ffffff;"></textarea>
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm" style="font-weight:700;">Save Internal Note</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Preferences Modal (Phase 4 Item 21) -->
+  <div class="modal-overlay" id="notif-settings-modal" role="dialog" aria-modal="true" aria-labelledby="notif-settings-title" hidden>
+    <div class="modal-panel" style="max-width:480px;">
+      <div class="modal-header">
+        <h2 id="notif-settings-title">Notification Preferences</h2>
+        <button class="modal-close" id="notif-settings-close-btn" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form class="modal-form" id="notif-settings-form">
+        <div class="pref-group">
+          <label class="pref-toggle-row">
+            <div><strong>In-App Notifications</strong><p>Live badges and alerts</p></div>
+            <input type="checkbox" id="pref-in-app" checked />
+          </label>
+          <label class="pref-toggle-row">
+            <div><strong>Email Notifications</strong><p>Receive email dispatches</p></div>
+            <input type="checkbox" id="pref-email" checked />
+          </label>
+          <label class="pref-toggle-row">
+            <div><strong>WhatsApp / SMS Alerts</strong><p>Resolution dispatches</p></div>
+            <input type="checkbox" id="pref-whatsapp" />
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:1rem;">Save Preferences</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- ===== FOOTER (Phase 6 Item 31) ===== -->
+  <footer class="site-footer" id="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand-col">
+          <a href="index.html" class="brand" aria-label="CamPulse Home">
+            <img src="favicon.png" alt="CamPulse Logo" class="brand-icon" width="32" height="32" />
+            <div class="brand-text">Cam<span>Pulse</span></div>
+          </a>
+          <p class="footer-tagline">
+            University Student Complaint &amp; Feedback Platform. Department Administration, SLA tracking, and resolution accountability.
+          </p>
+          <div class="footer-institution">
+            <span>🏛️ Obafemi Awolowo University, Ile-Ife</span>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h4 class="footer-col-title">Navigation</h4>
+          <ul class="footer-links">
+            <li><a href="index.html">Student Portal</a></li>
+            <li><a href="issues.html">Community Board</a></li>
+            <li><a href="dashboard.html">Student Dashboard</a></li>
+            <li><a href="admin.html">Admin Console</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 class="footer-col-title">Legal &amp; Policy</h4>
+          <ul class="footer-links">
+            <li><a href="#" class="footer-modal-trigger" data-modal="about-modal">About CamPulse</a></li>
+            <li><a href="#" class="footer-modal-trigger" data-modal="privacy-modal">Privacy &amp; Anonymity</a></li>
+            <li><a href="#" class="footer-modal-trigger" data-modal="terms-modal">Terms of Service</a></li>
+            <li><a href="#" class="footer-modal-trigger" data-modal="contact-modal">Contact &amp; Support</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 class="footer-col-title">Security &amp; SLA</h4>
+          <p style="font-size:var(--fs-xs);color:var(--clr-gray-500);line-height:1.45;margin-bottom:var(--sp-2);">
+            All complaints are encrypted and auto-routed to accredited university departments under 24h/72h service SLAs.
+          </p>
+          <span class="sla-badge ontime" style="font-size:0.7rem;">99.8% Uptime • SSL Verified</span>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>&copy; 2026 CamPulse. University Student Complaint &amp; Feedback Platform.</p>
+        <p class="footer-version">v2.4.0 • Production Ready</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Legal & Information Modals (Phase 6 Item 31) -->
+  <div class="modal-overlay" id="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title" hidden>
+    <div class="modal-panel" style="max-width:540px;">
+      <div class="modal-header">
+        <h2 id="about-modal-title">About CamPulse</h2>
+        <button type="button" class="modal-close legal-modal-close" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="font-size:var(--fs-xs);color:var(--clr-gray-700);line-height:1.6;">
+        <p><strong>CamPulse</strong> is an institutional accountability and feedback platform designed for university campuses, pioneering at <strong>Obafemi Awolowo University (OAU), Ile-Ife</strong>.</p>
+        <p>Our mission is to eliminate bureaucratic delays, give every student a verified voice, and provide departments with actionable SLA monitoring to fix campus infrastructure, academic bottlenecks, and welfare issues rapidly.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="privacy-modal" role="dialog" aria-modal="true" aria-labelledby="privacy-modal-title" hidden>
+    <div class="modal-panel" style="max-width:540px;">
+      <div class="modal-header">
+        <h2 id="privacy-modal-title">Privacy &amp; Anonymity Protection</h2>
+        <button type="button" class="modal-close legal-modal-close" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="font-size:var(--fs-xs);color:var(--clr-gray-700);line-height:1.6;">
+        <p>When you submit a complaint anonymously, department officers and faculty staff see only <strong>"Anonymous Student"</strong>.</p>
+        <p>Your true matriculation ID and email are encrypted and isolated strictly for institutional safety and abuse audits, accessible exclusively to the Super Administrator. Sensitive categories like Safety &amp; Security are kept strictly private by default.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title" hidden>
+    <div class="modal-panel" style="max-width:540px;">
+      <div class="modal-header">
+        <h2 id="terms-modal-title">Terms of Service</h2>
+        <button type="button" class="modal-close legal-modal-close" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="font-size:var(--fs-xs);color:var(--clr-gray-700);line-height:1.6;">
+        <p>CamPulse is dedicated to civil, constructive university improvement. Users agree not to submit defamatory, fraudulent, or harassing content.</p>
+        <p>Departments operate under 24-hour urgent and 72-hour standard SLA resolution targets. Rate limits of 5 submissions per hour are enforced to prevent abuse.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="contact-modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title" hidden>
+    <div class="modal-panel" style="max-width:540px;">
+      <div class="modal-header">
+        <h2 id="contact-modal-title">Contact &amp; Support</h2>
+        <button type="button" class="modal-close legal-modal-close" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="font-size:var(--fs-xs);color:var(--clr-gray-700);line-height:1.6;">
+        <p>For urgent administrative inquiries or emergency campus security concerns, please reach out to:</p>
+        <ul style="margin:0.5rem 0;padding-left:1.25rem;">
+          <li><strong>Division of Student Affairs:</strong> studentaffairs@oauife.edu.ng</li>
+          <li><strong>Works &amp; Maintenance:</strong> works@oauife.edu.ng</li>
+          <li><strong>Security Unit Emergency Line:</strong> +234 803 000 0000</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="supabase-client.js"></script>
+  <script src="app.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
